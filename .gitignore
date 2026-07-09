@@ -4,3 +4,4 @@ assets/
 studio/public/*/
 .env
 *.log
+.superpowers/
