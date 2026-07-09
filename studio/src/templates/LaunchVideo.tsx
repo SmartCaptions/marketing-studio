@@ -149,7 +149,7 @@ export const LaunchVideo: React.FC<Props> = ({kicker, headline, demo, features, 
   const t = launchTiming(demo.telemetry?.durationMs ?? null, features.length);
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
-      {/* loop backdrop behind every act except the demo (kept dark for footage contrast) */}
+      {/* loop backdrop behind every act; the demo stage covers most of it */}
       <BackgroundLoop dir={assets.loopSequence} frameCount={assets.loopFrames} opacity={0.55} />
       <AbsoluteFill
         style={{
@@ -170,7 +170,7 @@ export const LaunchVideo: React.FC<Props> = ({kicker, headline, demo, features, 
           <FeatureAct feature={feature} len={t.features[i].len} />
         </Sequence>
       ))}
-      <Sequence from={t.end.from}>
+      <Sequence from={t.end.from} durationInFrames={t.end.len}>
         <EndCard cta={cta} />
       </Sequence>
       <div style={{position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>

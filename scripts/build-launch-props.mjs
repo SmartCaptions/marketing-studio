@@ -1,3 +1,5 @@
+// Source of truth for launch video copy: props/noban-launch.json is GENERATED
+// by this script; edit copy here, never in the JSON (it gets clobbered).
 import {readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
