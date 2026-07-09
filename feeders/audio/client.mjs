@@ -57,7 +57,7 @@ const readEnv = () => {
 
 const measureMs = (file) => {
   // remotion bundles ffprobe; it prints stream info (incl. Duration) to stderr
-  const proc = spawnSync('npx', ['remotion', 'ffprobe', resolve(file)], {
+  const proc = spawnSync('npx', ['remotion', 'ffprobe', `"${resolve(file)}"`], {
     cwd: join(ROOT, 'studio'),
     shell: true,
     encoding: 'utf8',
