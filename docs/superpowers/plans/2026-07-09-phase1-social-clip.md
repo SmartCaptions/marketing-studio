@@ -109,7 +109,7 @@ Manual equivalents:
 - [ ] **Step 5: Write `CLAUDE.md`**
 
 ```markdown
-# animations — agent-driven animation studio
+# animations: agent-driven animation studio
 
 Remotion (studio/) renders all final video. brands/<id>.json holds per-product
 tokens (zod-validated via studio/src/lib/brand.ts); templates never hardcode
