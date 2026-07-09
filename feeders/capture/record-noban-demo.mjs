@@ -18,7 +18,13 @@ const NOBAN = process.env.NOBAN_ROOT ?? 'C:/Projects/noban-gg';
 const VIEWPORT = {width: 1600, height: 1000};
 const VIEW_HOLD_MS = 3200;
 
-const env = readFileSync(join(NOBAN, '.env'), 'utf8');
+let env;
+try {
+  env = readFileSync(join(NOBAN, '.env'), 'utf8');
+} catch {
+  console.error(`noban .env not found under ${NOBAN}. Run \`pnpm start\` there once to generate it.`);
+  process.exit(1);
+}
 const token = env.match(/^DASHBOARD_TOKEN=(.+)$/m)?.[1]?.trim();
 if (!token) {
   console.error('DASHBOARD_TOKEN not found in noban .env; run `pnpm start` there once.');
@@ -37,22 +43,23 @@ try {
 
 const videoDir = join(ROOT, 'out', 'capture');
 mkdirSync(videoDir, {recursive: true});
-const browser = await chromium.launch();
-const context = await browser.newContext({
-  viewport: VIEWPORT,
-  recordVideo: {dir: videoDir, size: VIEWPORT},
-});
-const page = await context.newPage();
-const rec = new Recorder();
-
-const nav = (name) => page.getByRole('button', {name, exact: true});
-const VIEWS = [
-  {name: 'Opportunities', caption: 'Detected opportunities, ranked by net dollars', ready: () => page.locator('tbody tr').first()},
-  {name: 'Ledger', caption: 'Every simulated trade lands in the ledger', ready: () => page.getByText('Open cost basis').first()},
-  {name: 'Governance', caption: 'Spend caps and approvals on every action', ready: () => page.getByText('Decision ledger').first()},
-];
-
+let browser;
 try {
+  browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: VIEWPORT,
+    recordVideo: {dir: videoDir, size: VIEWPORT},
+  });
+  const page = await context.newPage();
+  const rec = new Recorder();
+
+  const nav = (name) => page.getByRole('button', {name, exact: true});
+  const VIEWS = [
+    {name: 'Opportunities', caption: 'Detected opportunities, ranked by net dollars', ready: () => page.locator('tbody tr').first()},
+    {name: 'Ledger', caption: 'Every simulated trade lands in the ledger', ready: () => page.getByText('Open cost basis').first()},
+    {name: 'Governance', caption: 'Spend caps and approvals on every action', ready: () => page.getByText('Decision ledger').first()},
+  ];
+
   rec.start();
   await page.goto(`${base}/?token=${token}`, {waitUntil: 'networkidle'}).catch((e) => {
     throw redact(e);
@@ -91,5 +98,5 @@ try {
   console.error(redact(err).message);
   process.exitCode = 1;
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
 }
