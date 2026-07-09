@@ -5,6 +5,8 @@ import { ComponentGallery } from "./templates/ComponentGallery";
 import { SocialClip, socialClipSchema } from "./templates/SocialClip";
 import { ProductDemo, productDemoSchema } from "./templates/ProductDemo";
 import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
+import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
+import { launchTiming } from "./lib/launchTiming";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -72,6 +74,30 @@ export const RemotionRoot: React.FC = () => {
           frameCount: 90,
           cta: "Simulate free at noban.gg",
         }}
+      />
+      <Composition
+        id="LaunchVideo"
+        component={LaunchVideo}
+        durationInFrames={1350}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={launchVideoSchema}
+        defaultProps={{
+          brandId: "noban",
+          kicker: "noban.gg",
+          headline: "CS2 skin arbitrage with guardrails",
+          demo: {video: null, telemetry: null},
+          features: [],
+          cta: "Simulate free at noban.gg",
+          assets: {logoSequence: null, logoFrames: 90, loopSequence: null, loopFrames: 240},
+        }}
+        calculateMetadata={({props}) => ({
+          durationInFrames: launchTiming(
+            props.demo.telemetry?.durationMs ?? null,
+            props.features.length,
+          ).total,
+        })}
       />
     </>
   );
