@@ -63,7 +63,9 @@ const runHero = async (outDir, seed) => {
   }
   console.log(`comfy: ${base}`);
 
-  const info = await (await fetch(`${base}/object_info/CheckpointLoaderSimple`)).json();
+  const info = await (
+    await fetch(`${base}/object_info/CheckpointLoaderSimple`, {signal: AbortSignal.timeout(10_000)})
+  ).json();
   const checkpoint = process.env.COMFY_CHECKPOINT || firstCheckpoint(info);
   if (!checkpoint) {
     console.error('no checkpoints installed in ComfyUI; install a model or set COMFY_CHECKPOINT');
@@ -84,6 +86,7 @@ const runHero = async (outDir, seed) => {
       method: 'POST',
       headers: {'content-type': 'application/json'},
       body: JSON.stringify({prompt: graph, client_id: randomUUID()}),
+      signal: AbortSignal.timeout(10_000),
     })
   ).json();
   if (!queue.prompt_id) {
@@ -96,7 +99,9 @@ const runHero = async (outDir, seed) => {
   let images = [];
   while (Date.now() < deadline) {
     await sleep(POLL_MS);
-    const history = await (await fetch(`${base}/history/${queue.prompt_id}`)).json();
+    const history = await (
+      await fetch(`${base}/history/${queue.prompt_id}`, {signal: AbortSignal.timeout(10_000)})
+    ).json();
     images = imagesFromHistory(history, queue.prompt_id);
     if (images.length > 0) break;
   }
@@ -107,7 +112,9 @@ const runHero = async (outDir, seed) => {
 
   const img = images[0];
   const params = new URLSearchParams({filename: img.filename, subfolder: img.subfolder, type: img.type});
-  const bytes = Buffer.from(await (await fetch(`${base}/view?${params}`)).arrayBuffer());
+  const bytes = Buffer.from(
+    await (await fetch(`${base}/view?${params}`, {signal: AbortSignal.timeout(60_000)})).arrayBuffer(),
+  );
   mkdirSync(outDir, {recursive: true});
   const dest = join(outDir, 'hero.png');
   writeFileSync(dest, bytes);
