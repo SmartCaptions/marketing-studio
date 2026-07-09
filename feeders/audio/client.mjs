@@ -6,6 +6,7 @@
  * Usage:
  *   node feeders/audio/client.mjs vo --script <script.json> --out <dir>
  *   node feeders/audio/client.mjs music --prompt "<text>" --length-ms <n> --out <file>
+ *   node feeders/audio/client.mjs probe --file <mp3>
  */
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
@@ -55,7 +56,7 @@ const readEnv = () => {
   return out;
 };
 
-const measureMs = (file) => {
+export const measureMs = (file) => {
   // remotion bundles ffprobe; it prints stream info (incl. Duration) to stderr
   const proc = spawnSync('npx', ['remotion', 'ffprobe', `"${resolve(file)}"`], {
     cwd: join(ROOT, 'studio'),
@@ -86,9 +87,31 @@ const argValue = (args, flag) => {
   return args[i + 1];
 };
 
+// no API call: just resolves and validates the --file arg, so this is unit-testable
+// without spawning ffprobe.
+export const resolveProbeFile = (args) => {
+  const file = argValue(args, '--file');
+  if (!file) throw new Error('probe requires --file <mp3>');
+  return file;
+};
+
 const main = async () => {
   const args = process.argv.slice(2);
   const mode = args[0];
+
+  if (mode === 'probe') {
+    try {
+      const file = resolveProbeFile(args);
+      const ms = measureMs(file);
+      if (!ms) throw new Error(`could not measure duration of ${file}`);
+      console.log(`probe OK: ${file} ${ms}ms`);
+    } catch (err) {
+      console.error(String(err?.message ?? err));
+      process.exit(1);
+    }
+    return;
+  }
+
   const env = readEnv();
   const key = env.ELEVENLABS_API_KEY;
   if (!key) {
@@ -132,7 +155,7 @@ const main = async () => {
       if (!ms) throw new Error(`could not measure duration of ${outFile}`);
       console.log(`music OK: ${resolve(outFile)} ${ms}ms`);
     } else {
-      throw new Error('usage: client.mjs vo --script <json> --out <dir> | music --prompt <p> --length-ms <n> --out <file>');
+      throw new Error('usage: client.mjs vo --script <json> --out <dir> | music --prompt <p> --length-ms <n> --out <file> | probe --file <mp3>');
     }
   } catch (err) {
     console.error(redact(err?.message ?? String(err), key));

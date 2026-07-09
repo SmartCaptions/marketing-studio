@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildTtsUrl, buildMusicBody, parseFfprobeDuration, redact} from './client.mjs';
+import {buildTtsUrl, buildMusicBody, parseFfprobeDuration, redact, resolveProbeFile} from './client.mjs';
 
 test('buildTtsUrl embeds the voice id and mp3 output format', () => {
   assert.equal(
@@ -26,4 +26,16 @@ test('parseFfprobeDuration reads HH:MM:SS.cc into ms', () => {
 
 test('redact strips the secret from arbitrary text', () => {
   assert.equal(redact('boom sk_123 happened', 'sk_123'), 'boom <redacted> happened');
+});
+
+test('resolveProbeFile extracts the --file path', () => {
+  assert.equal(resolveProbeFile(['probe', '--file', 'out/logo.mp3']), 'out/logo.mp3');
+});
+
+test('resolveProbeFile throws when --file is missing', () => {
+  assert.throws(() => resolveProbeFile(['probe']), /--file/);
+});
+
+test('resolveProbeFile throws when --file has no value', () => {
+  assert.throws(() => resolveProbeFile(['probe', '--file']), /--file/);
 });
