@@ -116,13 +116,13 @@ const Feature: React.FC<{screenshot: string | null; lines: string[]}> = ({screen
               key={i}
               style={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 gap: 20,
                 opacity: s,
                 transform: `translateX(${(1 - s) * 40}px)`,
               }}
             >
-              <div style={{width: 10, height: 10, borderRadius: 5, background: brand.colors.brand}} />
+              <div style={{width: 10, height: 10, borderRadius: 5, background: brand.colors.brand, marginTop: 22}} />
               <div style={{fontFamily: fonts.body, fontWeight: 600, fontSize: 40, color: brand.colors.ink2}}>
                 {line}
               </div>
