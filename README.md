@@ -17,6 +17,8 @@ Manual equivalents:
     cd studio && npm install            # once
     node scripts/fetch-noban-assets.mjs # once: copy noban screenshots (gitignored) into studio/public/
     node feeders/capture/record-noban-demo.mjs  # record dashboard demo (needs noban stack running)
+    python feeders/blender/render.py feeders/blender/scenes/logo_reveal.py --out assets/noban/logo-reveal --animation
+    node scripts/stage-blender-assets.mjs     # copy rendered sequences into studio/public/
     cd studio && npm run dev            # Remotion Studio
     node scripts/smoke.mjs              # frame-0 still of every composition
 
@@ -25,3 +27,4 @@ Manual equivalents:
     cd studio
     npx remotion render SocialClip ../out/noban/clip.mp4 --props=../props/noban-social-launch.json
     npx remotion render ProductDemo ../out/noban/demo.mp4 --props=../props/noban-demo.json
+    npx remotion render LogoReveal ../out/noban/logo-reveal.mp4 --props='{"brandId":"noban","sequence":"noban/logo-reveal","frameCount":90,"cta":"Simulate free at noban.gg"}'
