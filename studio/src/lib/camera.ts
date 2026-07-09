@@ -39,7 +39,7 @@ export const cameraAt = (
   const scale = 1 + (ZOOM - 1) * k;
   return {
     scale,
-    originX: clampOrigin(active.x, viewport.width, ZOOM),
-    originY: clampOrigin(active.y, viewport.height, ZOOM),
+    originX: clampOrigin(active.x, viewport.width, scale),
+    originY: clampOrigin(active.y, viewport.height, scale),
   };
 };

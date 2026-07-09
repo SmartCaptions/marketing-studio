@@ -34,4 +34,14 @@ describe('cameraAt', () => {
   it('returns rest camera for an empty click list', () => {
     expect(cameraAt([], 1000, VP)).toEqual({scale: 1, originX: 800, originY: 500});
   });
+
+  it('clamps against the current scale during ease-in, not the full zoom', () => {
+    const corner = [{type: 'click' as const, t: 5000, x: 10, y: 990}];
+    const cam = cameraAt(corner, 4700, VP); // 100ms into the ease-in, scale barely above 1
+    expect(cam.scale).toBeGreaterThan(1);
+    expect(cam.scale).toBeLessThan(1.35);
+    // invariant: origin stays within the safe range for the camera's own scale
+    expect(cam.originX).toBeGreaterThanOrEqual(VP.width / cam.scale / 2 - 1e-6);
+    expect(cam.originY).toBeLessThanOrEqual(VP.height - VP.height / cam.scale / 2 + 1e-6);
+  });
 });
