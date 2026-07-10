@@ -21,9 +21,9 @@ repo. Assets are copied out to the calling repo at the end.
 | ComfyUI feeder | `feeders/comfy/client.mjs hero [--seed N]` | non-load-bearing; exit 2 = fallback |
 | Stage Blender output | `scripts/stage-blender-assets.mjs [brandId]` | assets/<brand>/ -> studio/public/<brand>/ |
 | Launch props builder | `scripts/build-launch-props.mjs` | copy source of truth (JSON is generated) |
-| Static presets | `scripts/render-statics.mjs` | og.mp4 / og.gif / readme.gif |
+| Static presets | `scripts/render-statics.mjs` (noban), `scripts/render-<brand>-statics.mjs` per brand | og.png / og.mp4 / og.gif / readme.gif |
 | Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; exit 2 = silent fallback |
-| Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs` | VO/music copy source of truth -> props/<brand>-audio.json |
+| Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs <brand>` | VO/music copy source of truth -> props/<brand>-audio.json; merge takes brand argv, defaults noban |
 
 Compositions: SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
 ComponentGallery (test bench). All schemas carry `brandId`; templates resolve
@@ -89,6 +89,11 @@ placeholder so smoke stays green on a clean clone.
   the camera out during cursor approach windows.
 - NEVER print dashboard tokens; scripts read the product's .env at runtime and redact
   tokens from every error path.
+- Next.js dev-tools indicator (the dark "N" button) lives INSIDE A SHADOW ROOT
+  (`#devtools-indicator`), not light DOM — `nextjs-portal` removal/CSS misses it and it
+  ends up baked into footage. Capture scripts need a shadow-root-piercing interval sweep;
+  verify it's gone in the first extracted frame before recording the full take
+  (see record-paperroute-demo.mjs).
 
 ### Blender 5.1.2 (headless bpy) — each of these was a silent wrong-output bug
 - Scene cleanup: `for obj in list(bpy.data.objects): bpy.data.objects.remove(obj, do_unlink=True)`.
@@ -123,14 +128,24 @@ placeholder so smoke stays green on a clean clone.
   (default 47) make heroes reproducible; `--seed N` re-rolls.
 - The fallback is part of the contract: exit 2 + message; `render-statics.mjs` logs
   the procedural fallback. Never make an asset depend on ComfyUI being up.
+- `feeders/comfy/client.mjs` is noban-hardwired (violet prompt, `assets/noban/comfy`
+  output, negative prompt excludes "green"). Other brands take the procedural fallback
+  until someone parameterizes it — do not point it at a new brand as-is.
 
 ### Brand-driven effects and fonts (post-DashClaw-onboarding facts)
 - Backdrop wash/glow intensities are brand-driven via the optional `effects` block in
   brands/<id>.json (brand.ts has the schema + `alphaHex` helper; defaults reproduce
-  the original hardcoded values). LogoReveal consumes it; AnimatedOG/LaunchVideo still
-  carry the hardcoded-alpha pattern and are trivial to convert when a brand needs it.
-  A saturated brand color as a big radial hero-wash is a known failure mode — check
-  the brand's stated rules before leaning on the default.
+  the original hardcoded values). As of the paperroute run (2026-07-10) ALL five
+  templates consume it — LogoReveal, ProductDemo, LaunchVideo, SocialClip, AnimatedOG;
+  no hardcoded `${brand.colors.brand}<alpha>` washes remain. A saturated brand color
+  as a big radial hero-wash is a known failure mode — check the brand's stated rules
+  before leaning on the default (paperroute: wash MUST be 0, One Green Rule).
+- FloatBar's progress fill runs brand → profit tokens (changed from safe→profit→loss
+  during the paperroute run: a red-tipped scrubber reads as decoration-red and violates
+  brands whose red is error-only; noban's end color became its profit gold, on-identity).
+- FeaturePanel is orientation-aware (`height > width` switches row→column), so vertical
+  9:16 social clips render from the SAME SocialClip comp via
+  `npx remotion render SocialClip ... --width=1080 --height=1920`; no separate template.
 - Fonts are per-brand: `loadBrandFonts(brand)` keyed off brand.fonts, loaders
   registered in fonts.ts. Subset new Google Fonts loaders to 'latin' — an unsubset
   family fans out to dozens of font requests per render.
