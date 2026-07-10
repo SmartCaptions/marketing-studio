@@ -1,37 +1,126 @@
-# animations
+# Animation Studio
 
-Agent-driven animation studio. Remotion is the backbone; per-product brand
-configs live in `brands/`. Spec: `docs/superpowers/specs/2026-07-09-animation-studio-design.md`.
+An agent-driven animation studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you.
 
-## Setup
+![Animated OG loop rendered by the studio](docs/media/demo-og-loop.gif)
 
-Copy `.env.example` to `.env` and set `BLENDER_PATH` if Blender is not on PATH
-(used by the phase 3 feeder and `launch.py` health checks).
+*An animated OG loop the studio rendered for a real product, from brand tokens alone.*
 
-## Run
+## The one command
 
-    python launch.py     # health checks + opens Remotion Studio in the browser
+```
+/marketing
+```
 
-Manual equivalents:
+One run produces, in order:
 
-    cd studio && npm install            # once
-    node scripts/fetch-noban-assets.mjs # once: copy noban screenshots (gitignored) into studio/public/
-    node feeders/capture/record-noban-demo.mjs  # record dashboard demo (needs noban stack running)
-    python feeders/blender/render.py feeders/blender/scenes/logo_reveal.py --out assets/noban/logo-reveal --animation
-    node scripts/stage-blender-assets.mjs     # copy rendered sequences into studio/public/
-    node scripts/build-launch-props.mjs       # assemble launch video props from the latest demo capture
-    node feeders/comfy/client.mjs hero        # optional: AI hero backdrop (needs ComfyUI Desktop; falls back cleanly)
-    node scripts/render-statics.mjs           # og.mp4 + og.gif + readme.gif
-    cd studio && npm run dev            # Remotion Studio
-    node scripts/smoke.mjs              # frame-0 still of every composition
+| # | Asset | Skill behind it |
+|---|-------|-----------------|
+| 1 | Logo reveal (Blender + Remotion) | `/logo-reveal` |
+| 2 | Product demo with camera zooms and cursor (Playwright capture) | `/product-demo` |
+| 3 | 30 to 90 second launch video composing demo, logo, and copy | `/launch-video` |
+| 4 | Voiceover and music scored to the launch video (ElevenLabs) | `/audio-track` |
+| 5 | Social clips per platform (X, LinkedIn, TikTok) | `/social-clip` |
+| 6 | OG image, animated OG loop, README GIF | `/og-assets` |
 
-## Render
+The order is deliberate: the cheapest composition renders first so brand-token bugs surface before the expensive assets, the demo is filmed once and its footage feeds everything downstream, and audio is scored only after the launch video is picture-locked. The run keeps a manifest on disk, so a died session resumes where it stopped instead of starting over.
 
-    cd studio
-    npx remotion render SocialClip ../out/noban/clip.mp4 --props=../props/noban-social-launch.json
-    npx remotion render ProductDemo ../out/noban/demo.mp4 --props=../props/noban-demo.json
-    npx remotion render LogoReveal ../out/noban/logo-reveal.mp4 --props='{"brandId":"noban","sequence":"noban/logo-reveal","frameCount":90,"cta":"Simulate free at noban.gg"}'
-    npx remotion render LaunchVideo ../out/noban/launch.mp4 --props=../props/noban-launch.json
-    node scripts/build-noban-audio.mjs        # generate VO + music (needs ELEVENLABS_API_KEY in .env)
-    node scripts/merge-launch-audio.mjs       # merge audio manifest into launch props
-    npx remotion render LaunchVideo ../out/noban/launch-audio.mp4 --props=../out/noban/launch-audio-props.json
+Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-video`, `/audio-track`, `/social-clip`, or `/og-assets` on its own from any repo.
+
+## How it works
+
+- **One engine, many brands.** All rendering happens in this repo, never in your product's repo. Finished assets are copied out at the end.
+- **Remotion is the backbone.** Every final video renders through Remotion compositions in `studio/` (SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG).
+- **Brands are data.** `brands/<id>.json` holds your product's tokens (13 colors, 3 fonts, tagline, voice rules), zod-validated. Templates resolve `getBrand(brandId)` and never hardcode brand values, so a new product is a JSON file and a logo mark component, not a fork.
+- **Feeders produce raw material.** Playwright records your running app for demos, headless Blender renders 3D logo reveals, ElevenLabs generates voiceover and music, and ComfyUI can add AI backdrops. Every feeder degrades cleanly when its dependency is missing.
+- **The knowledge lives in the skills.** The `skills/` directory ships the Claude Code skills that operate this repo, including the hard-won gotchas in `docs/PLAYBOOK.md` (camera math, seamless-loop rules, Blender API traps) so the agent does not re-derive them.
+
+## Quick start
+
+Requirements: [Claude Code](https://claude.com/claude-code), Node 20+, Python 3.10+. Optional: Blender (3D logo reveals), an ElevenLabs API key (audio), ComfyUI (AI backdrops); everything falls back cleanly without them.
+
+```bash
+git clone git@github.com:ucsandman/animation-studio.git
+cd animation-studio
+cd studio && npm install && cd ..
+cp .env.example .env            # set BLENDER_PATH / ELEVENLABS_API_KEY if you have them
+node scripts/install-skills.mjs # installs /marketing and friends into ~/.claude/skills
+python launch.py --check        # verifies the toolchain
+```
+
+Then, from your product's repo:
+
+```bash
+claude
+> /marketing
+```
+
+The agent asks one batched round of questions (brand, destination, audio, platforms, checkpoint mode) and runs the whole pipeline. If your brand is new, it derives tokens from your repo's design system (DESIGN.md, Tailwind config, CSS variables) and only asks for what it cannot infer.
+
+## The skills
+
+| Skill | What it does |
+|-------|--------------|
+| `/marketing` | The full pipeline: sequencing, gates, run manifest, resume, final QA and delivery gallery |
+| `/logo-reveal` | Animated logo reveal video (Blender draw-on choreography composited in Remotion) |
+| `/product-demo` | Screen-Studio style demo: films your running app, adds measured camera zooms and cursor |
+| `/launch-video` | Hero announcement video composing demo footage, logo reveal, and copy |
+| `/audio-track` | Voiceover and music for any video, or standalone audio |
+| `/social-clip` | Short feature clips sized per platform |
+| `/og-assets` | OG image, animated OG loop, README GIF, social cards |
+| `animation-studio` | Shared background skill: engine workflow, brand onboarding, non-negotiables |
+
+`scripts/install-skills.mjs` copies them into `~/.claude/skills` and rewrites the engine path to wherever you cloned this repo. The `/marketing` pipeline optionally uses UI-polish skills (`impeccable`, `polish`, `frontend-verify`) before filming; without them it simply films your app as-is.
+
+## Repo layout
+
+```
+brands/            per-product brand tokens (zod-validated JSON)
+studio/            Remotion project: all final video compositions
+feeders/blender/   headless bpy scenes (3D logo reveals)
+feeders/capture/   Playwright recorder (product demos)
+feeders/audio/     ElevenLabs client (voiceover + music)
+feeders/comfy/     ComfyUI client (optional AI backdrops)
+skills/            the Claude Code skills that drive all of this
+scripts/           props builders, staging, statics, smoke
+props/             generated render props (edit via their builder scripts only)
+docs/PLAYBOOK.md   the operational reference: engine map, onboarding, gotchas
+launch.py          single-command health check + Remotion Studio
+```
+
+`out/`, `assets/`, and `studio/public/*/` are build products and stay untracked.
+
+## Manual controls
+
+Everything the skills do can be run by hand:
+
+```bash
+python launch.py                    # health checks + Remotion Studio
+node scripts/smoke.mjs              # frame-0 still of every composition
+cd studio && npx remotion render LogoReveal ../out/<brand>/logo.mp4 \
+  --props='{"brandId":"<brand>","cta":"..."}'
+```
+
+`docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.
+
+## Adding a brand
+
+1. `brands/<id>.json` copying the shape of an existing brand (colors, fonts, tagline, voice rules).
+2. Register it in `studio/src/lib/brand.ts` and add a mark component in `studio/src/brands/`.
+3. `cd studio && npm test` validates the schema.
+
+The `/marketing` skill does all of this for you from your product repo's design system; the steps above are the manual path. Details in `docs/PLAYBOOK.md`.
+
+## Verification
+
+```bash
+python launch.py --check   # toolchain health
+node scripts/smoke.mjs     # renders frame 0 of every composition; must stay green
+cd studio && npm test      # brand schema tests
+```
+
+Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.
+
+## License
+
+MIT
