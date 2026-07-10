@@ -40,9 +40,10 @@ const LINES = [
 
 const MUSIC_PROMPT =
   'restrained minimal instrumental, quiet analog synth pulse and soft mechanical clicks like a ' +
-  'relay closing, deliberate steady tempo around 92 bpm, understated tension that resolves into ' +
-  'a calm steady close at the end, no drum build, no pads, no vocals, precise and controlled ' +
-  'throughout';
+  'relay closing, deliberate steady tempo around 92 bpm, no drum build, no pads, no vocals, ' +
+  'precise and controlled throughout, energy sustains at full level until the final five ' +
+  'seconds, then resolves onto a held closing chord that keeps sounding to the very last ' +
+  'second of the track, no fade out, no early decay, no silence at the end';
 
 // total duration in ms; constants mirror studio/src/lib/launchTiming.ts
 const telemetry = JSON.parse(readFileSync(join(root, 'props', 'dashclaw-demo.json'), 'utf8')).telemetry;
