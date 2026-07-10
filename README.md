@@ -29,11 +29,11 @@ Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-
 
 ## Example output
 
-Everything below was produced by `/marketing` runs against two real products, unedited. Click a preview to play the video on GitHub.
+Everything below was produced by `/marketing` runs against two real products, unedited. Turn the sound on: the voiceover and music are generated too.
 
 ### noban.gg (CS2 skin arbitrage dashboard)
 
-[![noban launch video preview](examples/noban/launch-still.png)](examples/noban/launch.mp4)
+https://github.com/user-attachments/assets/7d184b12-1afc-4129-a4f0-87a33da986e3
 
 | File | Asset |
 |------|-------|
@@ -45,7 +45,7 @@ Everything below was produced by `/marketing` runs against two real products, un
 
 ### paperroute.gg (wallpaper ad network)
 
-[![paperroute launch video preview](examples/paperroute/launch-still.png)](examples/paperroute/launch.mp4)
+https://github.com/user-attachments/assets/1bf89936-4f8b-405a-b507-5f051ae18ef8
 
 | File | Asset |
 |------|-------|
