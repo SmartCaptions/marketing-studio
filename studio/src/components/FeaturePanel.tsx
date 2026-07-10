@@ -1,7 +1,8 @@
 import React from 'react';
-import {AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
+import {brandSpring, staggerDelay} from '../lib/motion';
 
 export const FeaturePanel: React.FC<{
   screenshot: string | null;
@@ -13,7 +14,7 @@ export const FeaturePanel: React.FC<{
   const {fps, width, height} = useVideoConfig();
   const isPortrait = height > width;
   const fonts = loadBrandFonts(brand);
-  const panelIn = spring({frame, fps, config: {damping: 200}});
+  const panelIn = brandSpring(frame, fps, brand.motion);
   const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);
   return (
     <AbsoluteFill
@@ -68,7 +69,7 @@ export const FeaturePanel: React.FC<{
         }}
       >
         {lines.map((line, i) => {
-          const s = spring({frame: frame - 15 - i * 10, fps, config: {damping: 200}});
+          const s = brandSpring(frame, fps, brand.motion, {delayFrames: 15 + staggerDelay(i, 10, brand.motion)});
           return (
             <div
               key={i}

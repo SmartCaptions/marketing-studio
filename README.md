@@ -122,7 +122,9 @@ feeders/audio/     ElevenLabs client (voiceover + music)
 feeders/comfy/     ComfyUI client (optional AI backdrops)
 skills/            the Claude Code skills that drive all of this
 examples/          real output: full asset suites for two shipped products
-scripts/           props builders, staging, statics, smoke
+scripts/           props builders, staging, statics, smoke, copy linter, brief
+                   gatherer, storyboard board, export matrix, captions,
+                   Mission Control review server
 props/             generated render props (edit via their builder scripts only)
 docs/PLAYBOOK.md   the operational reference: engine map, onboarding, gotchas
 launch.py          single-command health check + Remotion Studio
@@ -139,6 +141,10 @@ python launch.py                    # health checks + Remotion Studio
 node scripts/smoke.mjs              # frame-0 still of every composition
 cd studio && npx remotion render LogoReveal ../out/<brand>/logo.mp4 \
   --props='{"brandId":"<brand>","cta":"..."}'
+node scripts/lint-copy.mjs props/<brand>-launch.json   # no-slop copy gate
+node scripts/render-matrix.mjs <brand> --stills-only   # 16:9/9:16/1:1/4:5 fan-out
+node scripts/build-captions.mjs <brand> --check        # SRT/VTT sidecars
+node scripts/mission-control.mjs <brand>               # click-to-approve run console
 ```
 
 `docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.

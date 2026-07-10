@@ -24,6 +24,12 @@ repo. Assets are copied out to the calling repo at the end.
 | Static presets | `scripts/render-statics.mjs` (noban), `scripts/render-<brand>-statics.mjs` per brand | og.png / og.mp4 / og.gif / readme.gif |
 | Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; exit 2 = silent fallback |
 | Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs <brand>` | VO/music copy source of truth -> props/<brand>-audio.json; merge takes brand argv, defaults noban |
+| Content brief gatherer | `scripts/derive-brief.mjs <brand> <productRepo> [--url]` | grounding -> out/<brand>/marketing/brief-inputs.json; agent synthesizes brief.json (zod: `studio/src/lib/brief.ts`); build-launch-props overlays brief copy when brief.json exists |
+| Copy voice-linter | `scripts/lint-copy.mjs <file.json> [--json]` | gates any props/brief JSON: em dashes, slop lexicon, hype; exit 1 on violations |
+| Storyboard board | `scripts/build-storyboard.mjs <brand>` | brief.json -> out/<brand>/marketing/storyboard.html (content approval before any render) |
+| Mission Control | `scripts/mission-control.mjs <brand> [--port 4600]` | live run console over run.json; Approve/Redo buttons write manifest + review.json atomically |
+| Export matrix | `scripts/render-matrix.mjs <brand> [--comp] [--stills-only]` + `scripts/platforms.json` | fans LaunchVideo/SocialClip into 16:9/9:16/1:1/4:5 via calculateMetadata props (no --width CLI flag in Remotion 4.0.486); captioned variants for muted-autoplay rows when audio props exist |
+| Caption sidecars | `scripts/build-captions.mjs <brand> [--check]` | props/<brand>-audio.json -> out/<brand>/captions/launch.srt + .vtt |
 
 Compositions: SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
 ComponentGallery (test bench). All schemas carry `brandId`; templates resolve
@@ -35,7 +41,10 @@ placeholder so smoke stays green on a clean clone.
 1. `brands/<id>.json` — copy `brands/noban.json` shape exactly (zod-enforced: 13 color
    tokens, 3 fonts, tagline, voice). Derive values from the product repo's DESIGN.md,
    tailwind config, or CSS variables; ask the user for anything ambiguous. Encode the
-   brand's color RULES in `voice` (e.g. noban: profit gold NEVER green).
+   brand's color RULES in `voice` (e.g. noban: profit gold NEVER green). Optional
+   zod-defaulted blocks: `grade` (FilmGrade grain/vignette/bloom/aberration/letterbox —
+   zero bloom for brands whose voice forbids glow) and `motion` (tempo/exuberance/
+   stagger/overshoot — the brand's choreography personality; rest positions never change).
 2. Register it in `studio/src/lib/brand.ts` (import + registry entry).
 3. Mark component: `studio/src/brands/<Brand>Mark.tsx` recreating the product's logo
    SVG (viewBox-normalized, `{size, color}` props, `currentColor` strokes), then

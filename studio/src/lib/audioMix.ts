@@ -18,7 +18,9 @@ export type AudioManifest = z.infer<typeof audioSchema>;
 type Timing = {logo: Act; hook: Act; demo: Act; features: Act[]; end: Act};
 
 const FPS = 30;
-const VO_LEAD = 12;
+// Frames of music-only lead-in before each VO line starts. Exported so
+// captionTiming.ts places captions on the exact same window as the spoken audio.
+export const VO_LEAD = 12;
 const BASE = 0.35;
 const DUCKED = 0.12;
 const RAMP = 9;

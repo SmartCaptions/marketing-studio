@@ -6,6 +6,7 @@ import {loadBrandFonts} from '../lib/fonts';
 import {getMark} from '../brands/marks';
 import {FloatBar} from '../components/FloatBar';
 import {BackgroundLoop} from '../components/BackgroundLoop';
+import {FilmGrade} from '../components/FilmGrade';
 
 export const animatedOgSchema = z.object({
   brandId: z.string(),
@@ -74,6 +75,7 @@ export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, l
       <div style={{position: 'absolute', bottom: 36, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={barProgress} brand={brand} width={480} />
       </div>
+      <FilmGrade grade={brand.grade} accent={brand.colors.brand} />
     </AbsoluteFill>
   );
 };

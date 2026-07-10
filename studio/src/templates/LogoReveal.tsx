@@ -1,16 +1,16 @@
 import React from 'react';
 import {
   AbsoluteFill,
-  interpolate,
-  spring,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
+import {brandSpring, entrance} from '../lib/motion';
 import {getMark} from '../brands/marks';
 import {PngSequence} from '../components/PngSequence';
+import {FilmGrade} from '../components/FilmGrade';
 
 export const logoRevealSchema = z.object({
   brandId: z.string(),
@@ -27,11 +27,8 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta}
   const brand = getBrand(brandId);
   const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
-  const wordmarkIn = spring({frame: frame - 66, fps, config: {damping: 200}});
-  const ctaIn = interpolate(frame, [96, 110], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const wordmarkIn = brandSpring(frame, fps, brand.motion, {delayFrames: 66});
+  const ctaIn = entrance(frame, fps, brand.motion, {delayFrames: 96, durFrames: 14});
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
       <AbsoluteFill
@@ -78,6 +75,7 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta}
           {cta.toUpperCase()}
         </div>
       </AbsoluteFill>
+      <FilmGrade grade={brand.grade} accent={brand.colors.brand} />
     </AbsoluteFill>
   );
 };

@@ -6,6 +6,7 @@ import {FloatBar} from '../components/FloatBar';
 import {Caption} from '../components/Caption';
 import {EndCard} from '../components/EndCard';
 import {DemoStage} from '../components/DemoStage';
+import {FilmGrade} from '../components/FilmGrade';
 import {telemetrySchema, steps} from '../lib/telemetry';
 
 export const productDemoSchema = z.object({
@@ -61,6 +62,7 @@ export const ProductDemo: React.FC<Props> = ({brandId, video, cta, telemetry}) =
       <div style={{position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={frame / (durationInFrames - 1)} brand={brand} width={640} />
       </div>
+      <FilmGrade grade={brand.grade} accent={brand.colors.brand} />
     </AbsoluteFill>
   );
 };

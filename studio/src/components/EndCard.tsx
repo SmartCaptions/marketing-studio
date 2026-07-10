@@ -1,14 +1,15 @@
 import React from 'react';
-import {AbsoluteFill, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
+import {brandSpring} from '../lib/motion';
 import {getMark} from '../brands/marks';
 
 export const EndCard: React.FC<{cta: string; brand: Brand}> = ({cta, brand}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const fonts = loadBrandFonts(brand);
-  const s = spring({frame, fps, config: {damping: 200}});
+  const s = brandSpring(frame, fps, brand.motion);
   const Mark = getMark(brand.id);
   return (
     <AbsoluteFill

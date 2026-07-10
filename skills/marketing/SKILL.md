@@ -36,6 +36,8 @@ Fresh runs only. Ask everything in a single AskUserQuestion, then run without as
    - `delivered` — copied to the product repo.
    Update the manifest after every status change. Never restart a run from scratch because the session died.
 
+**Content approval gate.** Once `out/<brand>/marketing/brief.json` is synthesized and passes `node scripts/lint-copy.mjs`, run `node scripts/build-storyboard.mjs <brand>` and show the user `storyboard.html` for content approval BEFORE any rendering; in full-auto mode the main-loop judge reviews it instead.
+
 ## Phase 2 — UI polish (only if opted in)
 
 In the PRODUCT repo: impeccable → polish → frontend-verify. Must fully complete before Phase 3 — re-shooting every asset because the UI changed after capture doubles the run. Commit product-repo polish separately from asset delivery.
@@ -54,6 +56,8 @@ The engine repo is shared mutable state (props builders, registries, render queu
 | 6 | /og-assets | Statics + README GIF pulled from final footage |
 
 Per asset: stills gate before full render (each sub-skill enforces it), render logs `| tail -2`, then update the manifest.
+
+**Phase 3.5 — Responsive export matrix.** Once the launch video is picture-locked and the social clips are rendered, run `node scripts/render-matrix.mjs <brand>` to fan the launch video and social clips into all four aspects (16:9, 1:1, 4:5, 9:16) by responsive layout, not crops. Variants land in `out/<brand>/matrix/` and register in the manifest's `exports[]`. Add `--stills-only` first to prove the layout with one still per aspect before committing CPU to full renders. The muted-autoplay rows (9:16 and 1:1) additionally emit an `<id>-captioned` variant with the VO burned into on-screen captions, and `node scripts/build-captions.mjs <brand>` writes matching `launch.srt`/`launch.vtt` sidecars — both require the brand's audio props (skipped silently without them).
 
 ## Execution mode — pick by session model
 
@@ -90,7 +94,8 @@ Fable never goes inside a workflow (the model-guard hook blocks it in `parallel(
 ## Phase 5 — Delivery
 
 1. Copy every asset to the destination dir; write a README there listing each file and its intended use.
-2. Build an HTML contact-sheet gallery embedding every asset, labeled with paths, and SEND it plus the files to the user. **The run is not done until the user has seen the gallery.**
+2. Launch the operator console: `node scripts/mission-control.mjs <brand>` (add `--port N` if 4600 is taken). Tell the user the URL it prints (default `http://localhost:4600/`). This is a live click-to-approve gallery reading `out/<brand>/marketing/run.json` — one card per asset with the embedded artifact, an Approve button, a Redo box, and variant pickers. **The run is not done until the user has seen the gallery.**
+3. While it runs, poll `out/<brand>/marketing/run.json` and `out/<brand>/marketing/review.json` for the operator's actions: an asset flipped to `approved` in the manifest is that asset's approval gate cleared (approve is the manifest gate, never inferred from chat); a `redo` entry in `review.json` — with its note, also stored as `redoNote` on the asset (now back to `planned`) — feeds the Phase 3 correction loop. Re-render the redone asset per its skill, update the manifest, and the console picks up the new state on its next 2s poll.
 
 ## Phase 6 — Close out
 

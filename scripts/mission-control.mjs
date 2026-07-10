@@ -1,0 +1,588 @@
+// Mission Control — local click-to-approve run console for a marketing run.
+// Replaces the one-shot static contact sheet: the operator watches the run
+// manifest fill in live and approves / requests redos per asset from the browser.
+//
+//   node scripts/mission-control.mjs <brandId> [--port 4600]
+//
+// Zero npm deps (node:http/fs/path only). The manifest is written concurrently
+// by the running /marketing skill process, so run.json is re-read on every
+// request and all writes are atomic (temp file + rename). Read-modify-write on a
+// POST re-reads the manifest at write time — never a stale in-memory copy.
+import http from 'node:http';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  statSync,
+  createReadStream,
+} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {dirname, join, resolve, relative, isAbsolute, basename, extname} from 'node:path';
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  process.exit(1);
+});
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// ---- args ------------------------------------------------------------------
+const argv = process.argv.slice(2);
+let brand = null;
+let port = 4600;
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === '--port') port = parseInt(argv[++i], 10);
+  else if (a.startsWith('--port=')) port = parseInt(a.split('=')[1], 10);
+  else if (!a.startsWith('-') && !brand) brand = a;
+}
+if (!brand) {
+  console.error('usage: node scripts/mission-control.mjs <brandId> [--port 4600]');
+  process.exit(1);
+}
+if (!Number.isFinite(port)) {
+  console.error(`mission-control: invalid --port value`);
+  process.exit(1);
+}
+
+const brandOut = join(root, 'out', brand); // media root — nothing is served from outside this dir
+const marketingDir = join(brandOut, 'marketing');
+const runPath = join(marketingDir, 'run.json');
+const reviewPath = join(marketingDir, 'review.json');
+
+// ---- manifest i/o ----------------------------------------------------------
+function readRun() {
+  try {
+    return JSON.parse(readFileSync(runPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function atomicWrite(target, data) {
+  const tmp = join(
+    dirname(target),
+    `.${basename(target)}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`,
+  );
+  writeFileSync(tmp, data);
+  renameSync(tmp, target); // rename over target is atomic; a concurrent reader sees old-or-new, never partial
+}
+
+// ---- artifact resolution ---------------------------------------------------
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif']);
+const VIDEO_EXT = new Set(['.mp4', '.webm', '.mov', '.m4v']);
+const CONTENT_TYPES = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.m4v': 'video/x-m4v',
+  '.json': 'application/json',
+};
+
+// The manifest stores artifact paths either bare (relative to out/<brand>/) or
+// repo-root-relative (out/<brand>/foo.mp4). Normalise both to a path relative
+// to the media root, so /media/<rel> resolves inside out/<brand>/.
+function artifactRel(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  let p = raw.replace(/\\/g, '/').replace(/^\.\//, '');
+  const prefix = `out/${brand}/`;
+  if (p.startsWith(prefix)) p = p.slice(prefix.length);
+  return p;
+}
+
+// Pick the single artifact to embed for a card. output may be a string or an
+// object (og-assets ships {static, animatedLoop, ...}).
+function primaryRaw(entry) {
+  const o = entry.output ?? entry.artifact ?? entry.file ?? entry.path;
+  if (!o) return null;
+  if (typeof o === 'string') return o;
+  if (typeof o === 'object') {
+    const order = ['static', 'poster', 'image', 'png', 'animatedLoop', 'mp4', 'video', 'animatedGif', 'gif', 'readmeGif'];
+    for (const k of order) if (typeof o[k] === 'string') return o[k];
+    const first = Object.values(o).find((v) => typeof v === 'string');
+    return first ?? null;
+  }
+  return null;
+}
+
+function mediaKind(rel) {
+  const ext = extname(rel).toLowerCase();
+  if (IMAGE_EXT.has(ext)) return 'image';
+  if (VIDEO_EXT.has(ext)) return 'video';
+  return null;
+}
+
+// Resolve the on-disk artifact for an asset and, if it exists, attach a
+// computed _artifact {url, kind, sizeBytes}. Returns the entry enriched (never
+// mutates the manifest on disk).
+function enrichAsset(entry) {
+  const rel = artifactRel(primaryRaw(entry));
+  let _artifact = null;
+  if (rel) {
+    const full = safeMediaPath(rel);
+    if (full && existsSync(full)) {
+      let size = null;
+      try {
+        const st = statSync(full);
+        if (st.isFile()) size = st.size;
+      } catch {
+        size = null;
+      }
+      if (size != null) {
+        const kind = mediaKind(rel);
+        if (kind) _artifact = {url: '/media/' + rel.split('/').map(encodeURIComponent).join('/'), kind, sizeBytes: size};
+      }
+    }
+  }
+  return {...entry, _artifact};
+}
+
+// ---- media path safety -----------------------------------------------------
+// Returns an absolute path guaranteed to sit inside brandOut, or null if the
+// request escapes the media root (.. traversal, absolute paths, other drives).
+function safeMediaPath(relPath) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(relPath);
+  } catch {
+    return null;
+  }
+  if (decoded.includes('\0')) return null;
+  const full = resolve(brandOut, decoded);
+  const rel = relative(brandOut, full);
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null;
+  return full;
+}
+
+function serveMedia(req, res, relPath) {
+  const full = safeMediaPath(relPath);
+  if (!full || !existsSync(full)) {
+    res.writeHead(404, {'content-type': 'text/plain'});
+    res.end('not found');
+    return;
+  }
+  let st;
+  try {
+    st = statSync(full);
+  } catch {
+    res.writeHead(404, {'content-type': 'text/plain'});
+    res.end('not found');
+    return;
+  }
+  if (!st.isFile()) {
+    res.writeHead(404, {'content-type': 'text/plain'});
+    res.end('not found');
+    return;
+  }
+  const type = CONTENT_TYPES[extname(full).toLowerCase()] || 'application/octet-stream';
+  const range = req.headers.range;
+  if (range) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m) {
+      let start = m[1] === '' ? null : parseInt(m[1], 10);
+      let end = m[2] === '' ? null : parseInt(m[2], 10);
+      if (start === null) {
+        // suffix range: last N bytes
+        start = Math.max(0, st.size - end);
+        end = st.size - 1;
+      } else if (end === null || end >= st.size) {
+        end = st.size - 1;
+      }
+      if (start > end || start >= st.size) {
+        res.writeHead(416, {'content-range': `bytes */${st.size}`});
+        res.end();
+        return;
+      }
+      res.writeHead(206, {
+        'content-type': type,
+        'content-range': `bytes ${start}-${end}/${st.size}`,
+        'accept-ranges': 'bytes',
+        'content-length': end - start + 1,
+        'cache-control': 'no-store',
+      });
+      createReadStream(full, {start, end}).pipe(res);
+      return;
+    }
+  }
+  res.writeHead(200, {
+    'content-type': type,
+    'content-length': st.size,
+    'accept-ranges': 'bytes',
+    'cache-control': 'no-store',
+  });
+  createReadStream(full).pipe(res);
+}
+
+// ---- POST /asset/:id -------------------------------------------------------
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    req.on('data', (c) => {
+      total += c.length;
+      if (total > 1_000_000) {
+        reject(new Error('body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+async function handleAssetPost(req, res, id) {
+  let payload;
+  try {
+    payload = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    res.writeHead(400, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: 'invalid json body'}));
+    return;
+  }
+  const action = payload.action;
+  if (action !== 'approve' && action !== 'redo') {
+    res.writeHead(400, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: "action must be 'approve' or 'redo'"}));
+    return;
+  }
+
+  // Re-read the manifest at write time — the skill process may have written it
+  // since the page last loaded.
+  const run = readRun();
+  if (!run || !Array.isArray(run.assets)) {
+    res.writeHead(404, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: 'no run manifest'}));
+    return;
+  }
+  const entry = run.assets.find((a) => a.id === id);
+  if (!entry) {
+    res.writeHead(404, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: `no asset '${id}'`}));
+    return;
+  }
+
+  if (action === 'approve') {
+    entry.status = 'approved';
+    if (typeof payload.variant === 'string' && payload.variant) entry.selectedVariant = payload.variant;
+    delete entry.redoNote;
+  } else {
+    const note = typeof payload.note === 'string' ? payload.note : '';
+    // review.json is the correction log the skill polls. Re-read fresh so we
+    // append to whatever is already there.
+    let review = [];
+    if (existsSync(reviewPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(reviewPath, 'utf8'));
+        if (Array.isArray(parsed)) review = parsed;
+      } catch {
+        review = [];
+      }
+    }
+    review.push({assetId: id, action: 'redo', note, at: new Date().toISOString()});
+    atomicWrite(reviewPath, JSON.stringify(review, null, 2) + '\n');
+    entry.status = 'planned';
+    entry.redoNote = note;
+    if (typeof payload.variant === 'string' && payload.variant) entry.selectedVariant = payload.variant;
+  }
+
+  atomicWrite(runPath, JSON.stringify(run, null, 2) + '\n');
+  res.writeHead(200, {'content-type': 'application/json'});
+  res.end(JSON.stringify({ok: true, id, status: entry.status}));
+}
+
+// ---- state -----------------------------------------------------------------
+// Serves the run manifest, each asset enriched with a computed _artifact
+// (url/kind/sizeBytes) resolved against the disk at read time. The file is
+// never mutated; _artifact just spares the client from having to stat.
+function serveState(res) {
+  const run = readRun();
+  if (!run) {
+    res.writeHead(404, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: 'no run found'}));
+    return;
+  }
+  const enriched = {
+    ...run,
+    assets: Array.isArray(run.assets) ? run.assets.map(enrichAsset) : [],
+  };
+  res.writeHead(200, {'content-type': 'application/json', 'cache-control': 'no-store'});
+  res.end(JSON.stringify(enriched));
+}
+
+// ---- pages -----------------------------------------------------------------
+function noRunPage() {
+  return `<!doctype html><meta charset="utf-8"><title>Mission Control — no run</title>
+<style>${PAGE_CSS}</style>
+<div class="empty">
+  <h1>No run found</h1>
+  <p>Expected a manifest at:</p>
+  <code>out/${escapeHtml(brand)}/marketing/run.json</code>
+  <p class="dim">Start a <b>/marketing</b> run for <b>${escapeHtml(brand)}</b>, then reload. This page re-checks every 3s.</p>
+</div>
+<script>setInterval(function(){fetch('/state').then(function(r){if(r.ok)location.reload();}).catch(function(){});},3000);</script>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+
+const PAGE_CSS = `
+:root{color-scheme:dark;}
+*{box-sizing:border-box;}
+body{margin:0;background:#0d0f12;color:#e6e8eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.45;}
+header{position:sticky;top:0;z-index:10;background:#14171b;border-bottom:1px solid #262b31;padding:14px 22px;display:flex;flex-wrap:wrap;align-items:baseline;gap:16px;}
+header h1{margin:0;font-size:17px;font-weight:650;letter-spacing:.3px;}
+header .brand{color:#7fb2ff;}
+header .started{color:#8a929b;font-size:13px;}
+.counts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;}
+.count{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
+.count b{font-size:13px;}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.wrap{padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px;max-width:1500px;margin:0 auto;}
+.card{background:#14171b;border:1px solid #262b31;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+.card-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #21262c;}
+.card-head h2{margin:0;font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.card-head .skill{color:#6b7480;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+.chip{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 9px;border-radius:6px;border:1px solid;}
+.chip-planned{color:#c9d1d9;background:#20262d;border-color:#39424c;}
+.chip-rendered{color:#7fb2ff;background:#13233d;border-color:#284876;}
+.chip-approved{color:#8ce6a5;background:#123023;border-color:#256b45;}
+.chip-delivered{color:#d7b2ff;background:#241a3a;border-color:#4a3a75;}
+.chip-unknown{color:#e6b45a;background:#332612;border-color:#6b4f1f;}
+.dot-planned{background:#8a929b;}.dot-rendered{background:#7fb2ff;}.dot-approved{background:#8ce6a5;}.dot-delivered{background:#d7b2ff;}
+.media{background:#0a0c0e;display:flex;align-items:center;justify-content:center;min-height:150px;border-bottom:1px solid #21262c;}
+.media video,.media img{max-width:100%;max-height:320px;display:block;}
+.media .placeholder{color:#5a636d;font-size:13px;padding:38px 12px;text-align:center;}
+.meta{padding:9px 14px;font-size:12px;color:#8a929b;font-variant-numeric:tabular-nums;display:flex;gap:14px;flex-wrap:wrap;border-bottom:1px solid #21262c;}
+.redonote{padding:9px 14px;font-size:12px;color:#e6b45a;background:#1c1509;border-bottom:1px solid #21262c;}
+.variants{padding:10px 14px;border-bottom:1px solid #21262c;}
+.variants .vtitle{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8a929b;margin-bottom:6px;}
+.variants label{display:flex;align-items:center;gap:7px;font-size:13px;padding:3px 0;cursor:pointer;}
+.controls{padding:12px 14px;display:flex;flex-direction:column;gap:10px;margin-top:auto;}
+.controls .row{display:flex;gap:9px;}
+.btn{font:inherit;font-size:13px;font-weight:600;border-radius:8px;border:1px solid;padding:8px 14px;cursor:pointer;transition:filter .12s;}
+.btn:hover{filter:brightness(1.15);}
+.btn:active{filter:brightness(.9);}
+.btn.approve{background:#1c8a4c;border-color:#25a35b;color:#fff;flex:1;}
+.btn.redo{background:#2a2f36;border-color:#3a424c;color:#e6e8eb;}
+textarea{width:100%;background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;min-height:48px;}
+textarea::placeholder{color:#5a636d;}
+.empty{max-width:520px;margin:12vh auto;text-align:center;padding:0 20px;}
+.empty h1{font-size:22px;margin-bottom:12px;}
+.empty code{display:inline-block;background:#14171b;border:1px solid #262b31;border-radius:8px;padding:8px 12px;font-family:ui-monospace,Consolas,monospace;color:#7fb2ff;margin:8px 0;}
+.empty .dim{color:#8a929b;font-size:13px;}
+`;
+
+function consolePage() {
+  return `<!doctype html><meta charset="utf-8"><title>Mission Control — ${escapeHtml(brand)}</title>
+<style>${PAGE_CSS}</style>
+<header>
+  <h1>Mission Control · <span class="brand" id="hBrand"></span></h1>
+  <span class="started" id="hStarted"></span>
+  <div class="counts" id="hCounts"></div>
+</header>
+<main class="wrap" id="cards"></main>
+<script>
+const STATUSES = ['planned','rendered','approved','delivered'];
+const cardsEl = document.getElementById('cards');
+const lastRender = {}; // assetId -> serialized entry, so we only rebuild changed cards
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtSize(b){if(b==null)return null;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
+function fmtDur(e){
+  let ms=null;
+  if(typeof e.durationMs==='number')ms=e.durationMs;
+  else if(typeof e.durationSec==='number')ms=e.durationSec*1000;
+  else if(typeof e.duration==='number')ms=e.duration*1000;
+  if(ms==null)return null;
+  const s=ms/1000;
+  if(s<60)return s.toFixed(s<10?1:0)+'s';
+  const m=Math.floor(s/60);return m+':'+String(Math.round(s-m*60)).padStart(2,'0');
+}
+function variantLabel(v,i){
+  if(typeof v==='string')return v;
+  if(v&&typeof v==='object')return v.label||v.id||v.name||('variant '+(i+1));
+  return 'variant '+(i+1);
+}
+function variantValue(v,i){
+  if(typeof v==='string')return v;
+  if(v&&typeof v==='object')return v.id||v.label||v.name||String(i);
+  return String(i);
+}
+
+function cardHtml(e){
+  const status=STATUSES.indexOf(e.status)>=0?e.status:'unknown';
+  let media='<div class="placeholder">no artifact yet</div>';
+  if(e._artifact){
+    if(e._artifact.kind==='video')media='<video controls preload="metadata" src="'+esc(e._artifact.url)+'"></video>';
+    else media='<img loading="lazy" src="'+esc(e._artifact.url)+'" alt="'+esc(e.id)+'">';
+  }
+  const size=e._artifact?fmtSize(e._artifact.sizeBytes):null;
+  const dur=fmtDur(e);
+  const metaBits=[];
+  if(size)metaBits.push('<span>'+esc(size)+'</span>');
+  if(dur)metaBits.push('<span>'+esc(dur)+'</span>');
+  if(e.platform)metaBits.push('<span>'+esc(e.platform)+'</span>');
+  const meta=metaBits.length?'<div class="meta">'+metaBits.join('')+'</div>':'';
+  const redo=e.redoNote?'<div class="redonote">redo: '+esc(e.redoNote)+'</div>':'';
+  let variants='';
+  if(Array.isArray(e.variants)&&e.variants.length){
+    const opts=e.variants.map((v,i)=>{
+      const val=variantValue(v,i);const checked=e.selectedVariant===val?' checked':'';
+      return '<label><input type="radio" name="var-'+esc(e.id)+'" value="'+esc(val)+'"'+checked+'>'+esc(variantLabel(v,i))+'</label>';
+    }).join('');
+    variants='<div class="variants"><div class="vtitle">Variant</div>'+opts+'</div>';
+  }
+  return '<div class="card-head">'
+      +'<span class="chip chip-'+status+'">'+esc(e.status||'—')+'</span>'
+      +'<h2>'+esc(e.id)+'</h2>'
+      +(e.skill?'<span class="skill">'+esc(e.skill)+'</span>':'')
+    +'</div>'
+    +'<div class="media">'+media+'</div>'
+    +meta+redo+variants
+    +'<div class="controls">'
+      +'<div class="row"><button class="btn approve" data-act="approve">Approve</button></div>'
+      +'<textarea placeholder="Redo note: what should change"></textarea>'
+      +'<div class="row"><button class="btn redo" data-act="redo">Request redo</button></div>'
+    +'</div>';
+}
+
+function selectedVariant(cardEl){
+  const r=cardEl.querySelector('input[type=radio]:checked');
+  return r?r.value:undefined;
+}
+
+async function act(id,action,cardEl){
+  const note=action==='redo'?(cardEl.querySelector('textarea')?.value||''):undefined;
+  const body={action};
+  if(note!==undefined)body.note=note;
+  const variant=selectedVariant(cardEl);
+  if(variant!==undefined)body.variant=variant;
+  const btns=cardEl.querySelectorAll('button');btns.forEach(b=>b.disabled=true);
+  try{
+    const r=await fetch('/asset/'+encodeURIComponent(id),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){const t=await r.text();alert('Action failed: '+t);}
+  }catch(err){alert('Action failed: '+err.message);}
+  finally{btns.forEach(b=>b.disabled=false);}
+  refresh(); // pull fresh state immediately
+}
+
+cardsEl.addEventListener('click',ev=>{
+  const btn=ev.target.closest('button[data-act]');if(!btn)return;
+  const card=btn.closest('.card');if(!card)return;
+  act(card.dataset.id,btn.dataset.act,card);
+});
+
+function renderHeader(run){
+  document.getElementById('hBrand').textContent=run.brand||run.brandId||'';
+  const started=run.startedAt||run.started||'';
+  document.getElementById('hStarted').textContent=started?('started '+started):'';
+  const counts={planned:0,rendered:0,approved:0,delivered:0};
+  (run.assets||[]).forEach(a=>{if(counts[a.status]!=null)counts[a.status]++;});
+  document.getElementById('hCounts').innerHTML=STATUSES.map(s=>
+    '<span class="count"><span class="dot dot-'+s+'"></span>'+s+' <b>'+counts[s]+'</b></span>'
+  ).join('');
+}
+
+function render(run){
+  renderHeader(run);
+  const assets=run.assets||[];
+  const seen=new Set();
+  assets.forEach(e=>{
+    seen.add(e.id);
+    const key=JSON.stringify(e);
+    if(lastRender[e.id]===key)return; // entry unchanged — leave DOM (and any playing video) alone
+    lastRender[e.id]=key;
+    let card=cardsEl.querySelector('.card[data-id="'+CSS.escape(e.id)+'"]');
+    if(!card){card=document.createElement('div');card.className='card';card.dataset.id=e.id;cardsEl.appendChild(card);}
+    card.innerHTML=cardHtml(e);
+  });
+  // drop cards for assets no longer in the manifest
+  Array.from(cardsEl.children).forEach(c=>{if(!seen.has(c.dataset.id)){delete lastRender[c.dataset.id];c.remove();}});
+}
+
+async function refresh(){
+  try{
+    const r=await fetch('/state',{cache:'no-store'});
+    if(r.status===404){location.reload();return;} // run.json vanished — show the no-run page
+    if(!r.ok)return;
+    render(await r.json());
+  }catch(err){/* transient — try again next tick */}
+}
+
+refresh();
+setInterval(refresh,2000);
+</script>`;
+}
+
+// ---- server ----------------------------------------------------------------
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://localhost');
+  const path = url.pathname;
+
+  if (req.method === 'POST' && path.startsWith('/asset/')) {
+    const id = decodeURIComponent(path.slice('/asset/'.length));
+    handleAssetPost(req, res, id).catch((err) => {
+      console.error('mission-control: POST error', err);
+      if (!res.headersSent) {
+        res.writeHead(500, {'content-type': 'application/json'});
+        res.end(JSON.stringify({error: 'internal error'}));
+      }
+    });
+    return;
+  }
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, {'content-type': 'text/plain'});
+    res.end('method not allowed');
+    return;
+  }
+
+  if (path === '/state') {
+    serveState(res);
+    return;
+  }
+
+  if (path.startsWith('/media/')) {
+    serveMedia(req, res, path.slice('/media/'.length));
+    return;
+  }
+
+  if (path === '/' || path === '/index.html') {
+    const run = readRun();
+    if (!run) {
+      console.error(`mission-control: no run manifest at ${runPath}`);
+      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+      res.end(noRunPage());
+      return;
+    }
+    res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+    res.end(consolePage());
+    return;
+  }
+
+  res.writeHead(404, {'content-type': 'text/plain'});
+  res.end('not found');
+});
+
+server.on('error', (err) => {
+  console.error(`mission-control: failed to bind port ${port}:`, err.message);
+  process.exit(1);
+});
+
+server.listen(port, () => {
+  const url = `http://localhost:${port}/`;
+  if (!existsSync(runPath)) {
+    console.error(`mission-control: WARNING no manifest at ${runPath} yet — serving a "no run found" page until it appears.`);
+  }
+  console.log(`mission-control: ${brand} console at ${url}  (manifest: out/${brand}/marketing/run.json)`);
+});

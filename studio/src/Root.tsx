@@ -39,7 +39,13 @@ export const RemotionRoot: React.FC = () => {
           ],
           screenshot: "noban/cockpit.webp",
           cta: "Free in simulation",
+          burnCaptions: false,
+          voLines: null,
         }}
+        calculateMetadata={({props}) => ({
+          width: props.formatWidth ?? 1920,
+          height: props.formatHeight ?? 1080,
+        })}
       />
       <Composition
         id="ProductDemo"
@@ -93,12 +99,15 @@ export const RemotionRoot: React.FC = () => {
           cta: "Simulate free at noban.gg",
           assets: {logoSequence: null, logoFrames: 90, loopSequence: null, loopFrames: 240},
           audio: null,
+          burnCaptions: false,
         }}
         calculateMetadata={({props}) => ({
           durationInFrames: launchTiming(
             props.demo.telemetry?.durationMs ?? null,
             props.features.length,
           ).total,
+          width: props.formatWidth ?? 1920,
+          height: props.formatHeight ?? 1080,
         })}
       />
       <Composition
