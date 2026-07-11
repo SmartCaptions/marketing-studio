@@ -24,7 +24,7 @@ const shouldForce = (id) => forceAll || (forceIds?.has(id) ?? false);
 // logo-act line — the logo act is a silent brand reveal under music only. Serious,
 // precise, no hype, no exclamation marks. Verbs: intercept, enforce, record, verify.
 const LINES = [
-  {id: 'hook', text: 'Nothing sensitive runs until you allow it.'},
+  {id: 'hook', text: 'Catch the dangerous action before it runs.'},
   {
     id: 'demo',
     text:
@@ -39,11 +39,14 @@ const LINES = [
 ];
 
 const MUSIC_PROMPT =
-  'restrained minimal instrumental, quiet analog synth pulse and soft mechanical clicks like a ' +
-  'relay closing, deliberate steady tempo around 92 bpm, no drum build, no pads, no vocals, ' +
-  'precise and controlled throughout, energy sustains at full level until the final five ' +
-  'seconds, then resolves onto a held closing chord that keeps sounding to the very last ' +
-  'second of the track, no fade out, no early decay, no silence at the end';
+  'driving minimal electronic instrumental, a steady low synth pulse with a tight analog ' +
+  'kick and subtle percussive clicks giving it forward momentum, controlled tempo around ' +
+  '112 bpm, propulsive but disciplined, no drum fills, no pads, no vocals, no build or drop, ' +
+  'the pulse and kick sustain at full level until the final five seconds, then the rhythm ' +
+  'drops out and a single sustained analog pad note rings underneath at a steady, clearly ' +
+  'audible volume through the entire remaining length, the pad note does not fade or decay, ' +
+  'it holds at consistent volume all the way through the very last sample of the track, no ' +
+  'fade out, no early decay, no silence at any point in the track including the ending';
 
 // total duration in ms; constants mirror studio/src/lib/launchTiming.ts
 const telemetry = JSON.parse(readFileSync(join(root, 'props', 'dashclaw-demo.json'), 'utf8')).telemetry;

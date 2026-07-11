@@ -3,7 +3,13 @@
 // Telemetry is pulled from props/dashclaw-demo.json so the demo act never drifts.
 // Voice (brands/dashclaw.json): serious, precise, trustworthy. Verbs: intercept,
 // enforce, record, verify. No em dashes, no hype words, no exclamation marks.
-import {readFileSync, writeFileSync} from 'node:fs';
+//
+// If out/dashclaw/marketing/brief.json exists and validates, its COPY (headline,
+// feature headings + lines, cta) overrides the hardcoded copy below; the
+// screenshots/portraitScreenshots/assets/demo structure always stay local. With
+// no valid brief the output is byte-identical to the pre-brief builder (mirrors
+// scripts/build-launch-props.mjs's overlay convention).
+import {readFileSync, existsSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 
@@ -45,6 +51,51 @@ const launch = {
     loopFrames: 1,
   },
 };
+
+// Overlay Content Brief copy when a valid brief exists. Structural checks below
+// mirror studio/src/lib/brief.ts (the canonical zod schema, used by the studio +
+// tests) — same convention scripts/build-launch-props.mjs uses for noban.
+// A missing or malformed brief falls through to the hardcoded copy untouched, so
+// output is byte-identical with no brief present.
+const briefPath = join(root, 'out', 'dashclaw', 'marketing', 'brief.json');
+if (existsSync(briefPath)) {
+  const brief = validBrief(readFileSync(briefPath, 'utf8'));
+  if (!brief) {
+    console.warn('build-dashclaw-launch-props: out/dashclaw/marketing/brief.json is invalid; using hardcoded copy');
+  } else {
+    if (brief.hook.headline) launch.headline = brief.hook.headline;
+    if (brief.cta) launch.cta = brief.cta;
+    // Overlay copy by feature index; screenshots/portraitScreenshots stay local.
+    brief.features.slice(0, launch.features.length).forEach((bf, i) => {
+      if (bf.heading) launch.features[i].heading = bf.heading;
+      if (bf.benefitLines.length) launch.features[i].lines = bf.benefitLines.slice(0, 3);
+    });
+  }
+}
+
+// Returns the parsed brief if it structurally matches brief.ts (only the copy
+// fields this builder consumes are validated), otherwise null.
+function validBrief(text) {
+  let b;
+  try {
+    b = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!b || typeof b !== 'object') return null;
+  if (typeof b.brandId !== 'string' || b.brandId.length === 0) return null;
+  const hook = b.hook ?? {headline: '', altHeadlines: []};
+  if (typeof hook.headline !== 'string') return null;
+  const features = b.features ?? [];
+  if (!Array.isArray(features)) return null;
+  for (const f of features) {
+    if (!f || typeof f.heading !== 'string') return null;
+    if (!Array.isArray(f.benefitLines) || f.benefitLines.length > 3) return null;
+    if (!f.benefitLines.every((l) => typeof l === 'string')) return null;
+  }
+  if (b.cta != null && typeof b.cta !== 'string') return null;
+  return {hook, cta: typeof b.cta === 'string' ? b.cta : '', features};
+}
 
 writeFileSync(join(root, 'props', 'dashclaw-launch.json'), JSON.stringify(launch, null, 2) + '\n');
 console.log('wrote props/dashclaw-launch.json');

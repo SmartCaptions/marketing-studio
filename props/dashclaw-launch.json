@@ -1,7 +1,7 @@
 {
   "brandId": "dashclaw",
   "kicker": "dashclaw.io",
-  "headline": "Nothing sensitive runs until you allow it",
+  "headline": "Catch the dangerous action before it runs",
   "demo": {
     "video": "dashclaw/demo.webm",
     "telemetry": {

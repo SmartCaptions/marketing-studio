@@ -1,14 +1,14 @@
 {
   "music": {
     "src": "dashclaw/audio/music.mp3",
-    "durationMs": 55330
+    "durationMs": 58910
   },
   "lines": [
     {
       "act": "hook",
       "src": "dashclaw/audio/hook.mp3",
-      "durationMs": 2530,
-      "text": "Nothing sensitive runs until you allow it."
+      "durationMs": 2510,
+      "text": "Catch the dangerous action before it runs."
     },
     {
       "act": "demo",
