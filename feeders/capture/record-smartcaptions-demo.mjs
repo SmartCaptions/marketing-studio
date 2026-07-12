@@ -50,6 +50,9 @@ const MIN_CAPTION_DWELL_MS = 700;
 if (process.argv.includes('--fix-dwell')) {
   const propsPath = join(ROOT, 'props', 'smartcaptions-demo.json');
   const data = JSON.parse(readFileSync(propsPath, 'utf8'));
+  if (!Array.isArray(data.telemetry?.events)) {
+    throw new Error(`fix-dwell: ${propsPath} has no telemetry.events array; re-run the capture to regenerate it`);
+  }
   const events = data.telemetry.events;
 
   // Collect indices of step events in time order.

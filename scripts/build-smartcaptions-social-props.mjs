@@ -24,7 +24,11 @@ const kicker = 'smartcaptions.co.il';
 const byKey = Object.fromEntries(brief.features.map((f) => [f.key, f.benefitLines]));
 const REQUIRED_KEYS = ['one-click', 'languages', 'control'];
 for (const key of REQUIRED_KEYS) {
-  if (!byKey[key]) throw new Error(`build-smartcaptions-social-props: brief.features is missing a feature with key "${key}"`);
+  if (!Array.isArray(byKey[key]) || byKey[key].length < 3) {
+    throw new Error(
+      `build-smartcaptions-social-props: brief.features["${key}"] must have 3 benefitLines, got ${byKey[key]?.length ?? 'none'}`,
+    );
+  }
 }
 const f1 = byKey['one-click'];   // ["One click transcribes...", "No exports...", "Captions land..."]
 const f2 = byKey['languages'];   // ["Auto-detects...", "Translate captions...", "Hebrew and RTL..."]
