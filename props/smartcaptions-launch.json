@@ -17,11 +17,6 @@
           "label": "SmartCaptions: AI captions inside Premiere Pro"
         },
         {
-          "type": "step",
-          "t": 1650,
-          "label": "Sign in to your editing seat"
-        },
-        {
           "type": "click",
           "t": 1650,
           "x": 740,

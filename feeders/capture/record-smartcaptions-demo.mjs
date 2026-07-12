@@ -37,6 +37,56 @@ const WAIT_TAIL_S = 0.8;
 
 const CONFIG = {viewport: VIEWPORT, holdMs: HOLD_MS, audio: 'english_pauses_aesop.mp3', cut: [WAIT_LEAD_S, WAIT_TAIL_S]};
 
+// --- Post-process: fix caption dwell without re-filming ---
+// Usage: node record-smartcaptions-demo.mjs --fix-dwell
+//
+// Loads the existing props/smartcaptions-demo.json and merges any consecutive
+// step-type events that are <700ms apart by DROPPING the earlier step (the click
+// event and all timing stay intact; only the caption label is removed so the next
+// caption receives the full dwell window). Rewrites the props file in place and
+// prints what changed. Does NOT re-run the capture or touch the video file.
+const MIN_CAPTION_DWELL_MS = 700;
+
+if (process.argv.includes('--fix-dwell')) {
+  const propsPath = join(ROOT, 'props', 'smartcaptions-demo.json');
+  const data = JSON.parse(readFileSync(propsPath, 'utf8'));
+  const events = data.telemetry.events;
+
+  // Collect indices of step events in time order.
+  const stepIndices = events
+    .map((e, i) => ({e, i}))
+    .filter(({e}) => e.type === 'step')
+    .sort((a, b) => a.e.t - b.e.t);
+
+  const dropped = [];
+  const toDrop = new Set();
+  for (let k = 1; k < stepIndices.length; k++) {
+    const prev = stepIndices[k - 1];
+    const curr = stepIndices[k];
+    const gap = curr.e.t - prev.e.t;
+    if (gap < MIN_CAPTION_DWELL_MS && !toDrop.has(prev.i)) {
+      // Drop the earlier step so the next caption gets the full dwell.
+      toDrop.add(prev.i);
+      dropped.push({dropped: prev.e.label, keptNext: curr.e.label, gapMs: gap});
+    }
+  }
+
+  if (dropped.length === 0) {
+    console.log('fix-dwell: no caption steps found below the 700ms threshold — props unchanged.');
+    process.exit(0);
+  }
+
+  data.telemetry.events = events.filter((_, i) => !toDrop.has(i));
+  writeFileSync(propsPath, JSON.stringify(data, null, 2) + '\n');
+  for (const d of dropped) {
+    console.log(
+      `fix-dwell: dropped step "${d.dropped}" (${d.gapMs}ms before "${d.keptNext}"); click event preserved.`,
+    );
+  }
+  console.log(`fix-dwell: rewrote ${propsPath}`);
+  process.exit(0);
+}
+
 // --- Footage cache gate ---
 const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
@@ -188,7 +238,9 @@ try {
   // and tail beat, cut the middle, shift later events left.
   const events = telemetry.events;
   const uploadStep = events.find((e) => e.type === 'step' && e.label.startsWith('Drop in'));
+  if (!uploadStep) throw new Error('post-trim: step marker "Drop in..." not found in telemetry — label may have drifted');
   const resultStep = events.find((e) => e.type === 'step' && e.label.startsWith('Captions,'));
+  if (!resultStep) throw new Error('post-trim: step marker "Captions,..." not found in telemetry — STT may not have completed or label drifted');
   const cutFrom = uploadStep.t / 1000 + WAIT_LEAD_S;
   const cutTo = resultStep.t / 1000 - WAIT_TAIL_S;
   const destDir = join(ROOT, 'studio', 'public', 'smartcaptions');

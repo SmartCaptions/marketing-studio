@@ -21,8 +21,7 @@ const forceAll = forceFlagIdx >= 0 && !forceIds;
 const shouldForce = (id) => forceAll || (forceIds?.has(id) ?? false);
 
 // Spoken copy: written for the ear (say "SmartCaptions", not "smartcaptions.co.il").
-// Acts: logo, hook, demo, feature-1 (features[1]), feature-2 (features[2]), end.
-// feature-0 (the one-click panel) is covered by the demo narration; no VO line here.
+// Acts: logo, hook, demo, feature-0 (features[0]), feature-1 (features[1]), feature-2 (features[2]), end.
 const LINES = [
   {id: 'logo', text: 'SmartCaptions.'},
   {id: 'hook', text: 'Captions and subtitles for Premiere Pro, in one click.'},
@@ -30,6 +29,7 @@ const LINES = [
     id: 'demo',
     text: 'Open the panel, pick your settings, and transcribe your sequence. Real speech to text, timed to the word.',
   },
+  {id: 'feature-0', text: 'One click transcribes the whole sequence. No exports, no round trips.'},
   {id: 'feature-1', text: 'Auto detect the language, or translate on the way.'},
   {id: 'feature-2', text: 'Fix a word, drag a timing, and fill every gap on the timeline.'},
   {id: 'end', text: 'Stop typing captions. Try SmartCaptions free.'},

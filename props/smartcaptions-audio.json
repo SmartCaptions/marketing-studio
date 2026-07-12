@@ -23,6 +23,12 @@
       "text": "Open the panel, pick your settings, and transcribe your sequence. Real speech to text, timed to the word."
     },
     {
+      "act": "feature-0",
+      "src": "smartcaptions/audio/feature-0.mp3",
+      "durationMs": 4680,
+      "text": "One click transcribes the whole sequence. No exports, no round trips."
+    },
+    {
       "act": "feature-1",
       "src": "smartcaptions/audio/feature-1.mp3",
       "durationMs": 2930,
