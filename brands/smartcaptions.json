@@ -1,0 +1,36 @@
+{
+  "id": "smartcaptions",
+  "name": "SmartCaptions",
+  "tagline": "AI Captions & Subtitles for Premiere Pro, in One Click",
+  "url": "smartcaptions.co.il",
+  "colors": {
+    "bg": "#0f172a",
+    "surface": "#1e293b",
+    "surface2": "#24334a",
+    "line": "#334155",
+    "ink": "#ffffff",
+    "ink2": "#e5e7eb",
+    "ink3": "#9ca3af",
+    "brand": "#1667ff",
+    "profit": "#f7941d",
+    "safe": "#20c997",
+    "loss": "#ef4444",
+    "info": "#60a5fa",
+    "rare": "#f9b233"
+  },
+  "fonts": {
+    "display": "Inter",
+    "body": "Inter",
+    "mono": "Geist Mono"
+  },
+  "motion": {
+    "tempo": 1.05,
+    "exuberance": 0.25,
+    "stagger": 0.5,
+    "overshoot": 0.15,
+    "parallax": 0.2,
+    "settle": 0.25,
+    "textReveal": "maskWipe"
+  },
+  "voice": "Editor-to-editor, plain and confident, no hype. Blue (#1667ff) is the brand and carries UI surfaces; the logo's orange (#f7941d) and amber (#f9b233) are energy accents for highlights and caption emphasis only, never backgrounds. Captions read as captions: high-contrast white text on dark. Premiere Pro is the stage, the panel is the tool; show the work getting shorter."
+}
