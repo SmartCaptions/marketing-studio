@@ -1,0 +1,70 @@
+{
+  "brandId": "smartcaptions",
+  "video": "smartcaptions/demo.webm",
+  "cta": "Try free at smartcaptions.co.il",
+  "telemetry": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "durationMs": 18727,
+    "events": [
+      {
+        "type": "step",
+        "t": 419,
+        "label": "SmartCaptions: AI captions inside Premiere Pro"
+      },
+      {
+        "type": "step",
+        "t": 1650,
+        "label": "Sign in to your editing seat"
+      },
+      {
+        "type": "click",
+        "t": 1650,
+        "x": 740,
+        "y": 510
+      },
+      {
+        "type": "step",
+        "t": 1772,
+        "label": "The panel: languages, styling, one-click transcribe"
+      },
+      {
+        "type": "step",
+        "t": 4986,
+        "label": "Fill Timeline: gapless captions with one switch"
+      },
+      {
+        "type": "click",
+        "t": 4986,
+        "x": 651,
+        "y": 552
+      },
+      {
+        "type": "step",
+        "t": 8220,
+        "label": "Drop in your audio - real speech-to-text starts"
+      },
+      {
+        "type": "step",
+        "t": 11520,
+        "label": "Captions, timed to the word"
+      },
+      {
+        "type": "click",
+        "t": 11520,
+        "x": 727,
+        "y": 681
+      },
+      {
+        "type": "focus",
+        "t": 13724,
+        "x": 720,
+        "y": 558,
+        "w": 1150,
+        "h": 560
+      }
+    ]
+  }
+}
