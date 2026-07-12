@@ -1,0 +1,109 @@
+{
+  "brandId": "smartcaptions",
+  "kicker": "smartcaptions.co.il",
+  "headline": "Captions for Premiere Pro, in one click",
+  "demo": {
+    "video": "smartcaptions/demo.webm",
+    "telemetry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "durationMs": 18727,
+      "events": [
+        {
+          "type": "step",
+          "t": 419,
+          "label": "SmartCaptions: AI captions inside Premiere Pro"
+        },
+        {
+          "type": "step",
+          "t": 1650,
+          "label": "Sign in to your editing seat"
+        },
+        {
+          "type": "click",
+          "t": 1650,
+          "x": 740,
+          "y": 510
+        },
+        {
+          "type": "step",
+          "t": 1772,
+          "label": "The panel: languages, styling, one-click transcribe"
+        },
+        {
+          "type": "step",
+          "t": 4986,
+          "label": "Fill Timeline: gapless captions with one switch"
+        },
+        {
+          "type": "click",
+          "t": 4986,
+          "x": 651,
+          "y": 552
+        },
+        {
+          "type": "step",
+          "t": 8220,
+          "label": "Drop in your audio - real speech-to-text starts"
+        },
+        {
+          "type": "step",
+          "t": 11520,
+          "label": "Captions, timed to the word"
+        },
+        {
+          "type": "click",
+          "t": 11520,
+          "x": 727,
+          "y": 681
+        },
+        {
+          "type": "focus",
+          "t": 13724,
+          "x": 720,
+          "y": 558,
+          "w": 1150,
+          "h": 560
+        }
+      ]
+    }
+  },
+  "features": [
+    {
+      "screenshot": "smartcaptions/feature-1.png",
+      "heading": "Transcribe inside the edit",
+      "lines": [
+        "One click transcribes your whole sequence",
+        "No exports, no uploads, no round trips",
+        "Captions land straight on your timeline"
+      ]
+    },
+    {
+      "screenshot": "smartcaptions/feature-2.png",
+      "heading": "Any language, translated on the way",
+      "lines": [
+        "Auto-detects the spoken language",
+        "Translate captions as they generate",
+        "Hebrew and RTL handled properly"
+      ]
+    },
+    {
+      "screenshot": "smartcaptions/feature-3.png",
+      "heading": "Word-level control",
+      "lines": [
+        "Fix words and drag timings in the editor",
+        "Fill Timeline closes every caption gap",
+        "Max words per line fits your style"
+      ]
+    }
+  ],
+  "cta": "Try free at smartcaptions.co.il",
+  "assets": {
+    "logoSequence": "smartcaptions/logo-reveal",
+    "logoFrames": 90,
+    "loopSequence": null,
+    "loopFrames": 1
+  }
+}
