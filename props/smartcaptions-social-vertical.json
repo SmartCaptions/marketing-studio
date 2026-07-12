@@ -1,0 +1,14 @@
+{
+  "brandId": "smartcaptions",
+  "kicker": "smartcaptions.co.il",
+  "headline": "Inside Premiere Pro",
+  "lines": [
+    "One click transcribes your whole sequence",
+    "Auto-detects the spoken language",
+    "Fill Timeline closes every caption gap"
+  ],
+  "screenshot": "smartcaptions/feature-1.png",
+  "cta": "Try free at smartcaptions.co.il",
+  "formatWidth": 1080,
+  "formatHeight": 1920
+}
