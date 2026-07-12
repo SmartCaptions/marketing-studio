@@ -1,0 +1,44 @@
+{
+  "music": {
+    "src": "smartcaptions/audio/music.mp3",
+    "durationMs": 53760
+  },
+  "lines": [
+    {
+      "act": "logo",
+      "src": "smartcaptions/audio/logo.mp3",
+      "durationMs": 1330,
+      "text": "SmartCaptions."
+    },
+    {
+      "act": "hook",
+      "src": "smartcaptions/audio/hook.mp3",
+      "durationMs": 3760,
+      "text": "Captions and subtitles for Premiere Pro, in one click."
+    },
+    {
+      "act": "demo",
+      "src": "smartcaptions/audio/demo.mp3",
+      "durationMs": 7760,
+      "text": "Open the panel, pick your settings, and transcribe your sequence. Real speech to text, timed to the word."
+    },
+    {
+      "act": "feature-1",
+      "src": "smartcaptions/audio/feature-1.mp3",
+      "durationMs": 2930,
+      "text": "Auto detect the language, or translate on the way."
+    },
+    {
+      "act": "feature-2",
+      "src": "smartcaptions/audio/feature-2.mp3",
+      "durationMs": 3710,
+      "text": "Fix a word, drag a timing, and fill every gap on the timeline."
+    },
+    {
+      "act": "end",
+      "src": "smartcaptions/audio/end.mp3",
+      "durationMs": 3060,
+      "text": "Stop typing captions. Try SmartCaptions free."
+    }
+  ]
+}
