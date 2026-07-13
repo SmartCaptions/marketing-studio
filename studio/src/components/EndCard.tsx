@@ -3,14 +3,14 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {brandSpring} from '../lib/motion';
-import {getMark} from '../brands/marks';
+import {getHeroMark} from '../brands/marks';
 
 export const EndCard: React.FC<{cta: string; brand: Brand}> = ({cta, brand}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const fonts = loadBrandFonts(brand);
   const s = brandSpring(frame, fps, brand.motion);
-  const Mark = getMark(brand.id);
+  const Mark = getHeroMark(brand.id);
   return (
     <AbsoluteFill
       style={{justifyContent: 'center', alignItems: 'center', gap: 32, opacity: s, transform: `scale(${0.96 + s * 0.04})`}}

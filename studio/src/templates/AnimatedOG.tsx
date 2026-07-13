@@ -3,7 +3,7 @@ import {AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig} from 're
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
-import {getMark} from '../brands/marks';
+import {getHeroMark} from '../brands/marks';
 import {FloatBar} from '../components/FloatBar';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {FilmGrade} from '../components/FilmGrade';
@@ -33,7 +33,7 @@ export const AnimatedOG: React.FC<Props> = ({
   const {durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadBrandFonts(brand);
-  const Mark = getMark(brand.id);
+  const Mark = getHeroMark(brand.id);
   const cycle = frame / durationInFrames; // 0..1, and frame N == frame 0 on loop
   // triangular ping-pong: 0 -> 1 -> 0 across the loop, continuous at the seam
   const barProgress = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
