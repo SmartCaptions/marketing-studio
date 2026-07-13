@@ -36,6 +36,12 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
   const Mark = getMark(brand.id);
   const wordmarkIn = brandSpring(frame, fps, motion, {delayFrames: 66});
   const ctaIn = entrance(frame, fps, motion, {delayFrames: 96, durFrames: 14});
+  const heroLogo = hasHeroLogo(brand.id);
+  // Hero-logo brands need a larger box (550 vs 520) for ~475px artwork width,
+  // plus centering corrections for SVG canvas asymmetry (artwork 45px right of
+  // canvas center) and optical vertical placement (~490 instead of 540).
+  const logoSize = heroLogo ? 550 : 520;
+  const heroStyle = heroLogo ? {marginLeft: -89, marginTop: -50} : {};
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
       <AbsoluteFill
@@ -44,12 +50,12 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
         }}
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 28}}>
-        <div style={{width: 520, height: 520, filter: `drop-shadow(0 0 42px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
-          {hasHeroLogo(brand.id) ? (
+        <div style={{width: logoSize, height: logoSize, filter: `drop-shadow(0 0 42px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`, ...heroStyle}}>
+          {heroLogo ? (
             // Remotion-native three-band assembly reveal; replaces the Blender PNG
             // sequence for brands in the fullColorRegistry. Other brands fall through
             // to the PngSequence/Mark path byte-identically.
-            <SmartCaptionsReveal size={520} frame={frame} fps={fps} motion={motion} color={brand.colors.brand} />
+            <SmartCaptionsReveal size={logoSize} frame={frame} fps={fps} motion={motion} color={brand.colors.brand} />
           ) : sequence ? (
             <PngSequence
               dir={sequence}

@@ -103,16 +103,27 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = 
   const {fps} = useVideoConfig();
   const fade = useActFade(len);
   const {scale} = useFormat();
-  const box = Math.round(500 * scale);
+  const heroLogo = hasHeroLogo(brand.id);
+  // Hero-logo brands use a larger box (550 vs 500) so the SVG artwork renders at
+  // ~475px visible width (within the 450-500px target). The centering corrections
+  // account for SVG canvas asymmetry and flex-centering behaviour (negative margin
+  // shifts item by marginValue/2, not the full value, because the outer margin-box
+  // is centered — so the numbers are 2× what naive arithmetic would suggest):
+  //   • X: artwork center is ~45px right of SVG canvas center → marginLeft=-89 (2×45)
+  //   • Y: optical center ≈490 in 1080 is 50px above frame center → marginTop=-100 (2×50)
+  const box = Math.round((heroLogo ? 550 : 500) * scale);
   const Mark = getMark(brand.id);
   const glow = `drop-shadow(0 0 ${Math.round(42 * scale)}px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`;
+  const heroStyle = heroLogo
+    ? {marginLeft: Math.round(-89 * scale), marginTop: Math.round(-100 * scale)}
+    : {};
   return (
     <AbsoluteFill style={{opacity: fade, justifyContent: 'center', alignItems: 'center'}}>
-      {hasHeroLogo(brand.id) ? (
+      {heroLogo ? (
         // Remotion-native three-band assembly reveal for brands with a full-color
         // logo. Replaces the Blender PNG sequence for this brand only; all other
         // brands keep the PngSequence path byte-identically.
-        <div style={{width: box, height: box, filter: glow}}>
+        <div style={{width: box, height: box, filter: glow, ...heroStyle}}>
           <SmartCaptionsReveal size={box} frame={frame} fps={fps} motion={brand.motion} color={brand.colors.brand} />
         </div>
       ) : (

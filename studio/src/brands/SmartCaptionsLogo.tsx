@@ -5,6 +5,10 @@ import {Img, staticFile} from 'remotion';
 // middle 55% of the 1024x1024 canvas. We inflate the render size so that
 // the visible artwork fills the requested `size` footprint. The overflow
 // region is fully transparent, so no clipping is needed.
+//
+// IMPORTANT: Tailwind preflight applies `img { max-width: 100%; height: auto; }`
+// which would cap the Img at the container width (= size) instead of renderSize.
+// The Img must override both rules to render at the full inflated size.
 const ARTWORK_FILL = 0.55;
 
 /**
@@ -31,6 +35,10 @@ export const SmartCaptionsLogo: React.FC<{size: number; color: string}> = ({size
           position: 'absolute',
           width: renderSize,
           height: renderSize,
+          // Override Tailwind preflight's `max-width: 100%; height: auto` which
+          // would cap the image at the container width (size) instead of renderSize,
+          // breaking the artwork-fill inflation and the centering offset.
+          maxWidth: 'none',
           top: offset,
           left: offset,
         }}
