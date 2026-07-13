@@ -8,7 +8,8 @@ import {z} from 'zod';
 import {alphaHex, getBrand, motionOverrideSchema} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {brandSpring, entrance} from '../lib/motion';
-import {getMark} from '../brands/marks';
+import {getMark, hasHeroLogo} from '../brands/marks';
+import {SmartCaptionsReveal} from '../brands/SmartCaptionsReveal';
 import {PngSequence} from '../components/PngSequence';
 import {FilmGrade} from '../components/FilmGrade';
 
@@ -44,7 +45,12 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 28}}>
         <div style={{width: 520, height: 520, filter: `drop-shadow(0 0 42px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
-          {sequence ? (
+          {hasHeroLogo(brand.id) ? (
+            // Remotion-native three-band assembly reveal; replaces the Blender PNG
+            // sequence for brands in the fullColorRegistry. Other brands fall through
+            // to the PngSequence/Mark path byte-identically.
+            <SmartCaptionsReveal size={520} frame={frame} fps={fps} motion={motion} color={brand.colors.brand} />
+          ) : sequence ? (
             <PngSequence
               dir={sequence}
               frameCount={frameCount}

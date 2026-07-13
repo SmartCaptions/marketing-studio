@@ -29,7 +29,8 @@ import {FloatBar} from '../components/FloatBar';
 import {SoundTrack} from '../components/SoundTrack';
 import {FilmGrade} from '../components/FilmGrade';
 import {captionCues} from '../lib/captionTiming';
-import {getMark} from '../brands/marks';
+import {getMark, hasHeroLogo} from '../brands/marks';
+import {SmartCaptionsReveal} from '../brands/SmartCaptionsReveal';
 
 export const launchVideoSchema = z.object({
   brandId: z.string(),
@@ -98,26 +99,38 @@ const ActContainer: React.FC<{motion: Motion; children: React.ReactNode}> = ({mo
 };
 
 const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = ({assets, len, brand}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
   const fade = useActFade(len);
   const {scale} = useFormat();
   const box = Math.round(500 * scale);
   const Mark = getMark(brand.id);
+  const glow = `drop-shadow(0 0 ${Math.round(42 * scale)}px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`;
   return (
     <AbsoluteFill style={{opacity: fade, justifyContent: 'center', alignItems: 'center'}}>
-      <div style={{width: box, height: box, filter: `drop-shadow(0 0 ${Math.round(42 * scale)}px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
-        {assets.logoSequence ? (
-          <PngSequence
-            dir={assets.logoSequence}
-            frameCount={assets.logoFrames}
-            mode="clamp"
-            style={{width: '100%', height: '100%', display: 'block'}}
-          />
-        ) : (
-          <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
-            <Mark size={Math.round(400 * scale)} color={brand.colors.brand} />
-          </AbsoluteFill>
-        )}
-      </div>
+      {hasHeroLogo(brand.id) ? (
+        // Remotion-native three-band assembly reveal for brands with a full-color
+        // logo. Replaces the Blender PNG sequence for this brand only; all other
+        // brands keep the PngSequence path byte-identically.
+        <div style={{width: box, height: box, filter: glow}}>
+          <SmartCaptionsReveal size={box} frame={frame} fps={fps} motion={brand.motion} color={brand.colors.brand} />
+        </div>
+      ) : (
+        <div style={{width: box, height: box, filter: glow}}>
+          {assets.logoSequence ? (
+            <PngSequence
+              dir={assets.logoSequence}
+              frameCount={assets.logoFrames}
+              mode="clamp"
+              style={{width: '100%', height: '100%', display: 'block'}}
+            />
+          ) : (
+            <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
+              <Mark size={Math.round(400 * scale)} color={brand.colors.brand} />
+            </AbsoluteFill>
+          )}
+        </div>
+      )}
     </AbsoluteFill>
   );
 };

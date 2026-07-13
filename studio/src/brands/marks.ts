@@ -37,3 +37,10 @@ const fullColorRegistry: Partial<Record<string, MarkComponent>> = {
 export const getHeroMark = (id: string): MarkComponent => {
   return fullColorRegistry[id] ?? getMark(id);
 };
+
+/**
+ * Returns true when the brand has a full-color raster/SVG logo registered in
+ * the fullColorRegistry. Use to gate hero-logo overlays that only apply to
+ * brands with a real logo asset; other brands must remain byte-identical.
+ */
+export const hasHeroLogo = (id: string): boolean => id in fullColorRegistry;
