@@ -1,0 +1,15 @@
+{
+  "brandId": "smartcaptions",
+  "locale": "he",
+  "kicker": "smartcaptions.co.il",
+  "headline": "בתוך פרמייר פרו",
+  "lines": [
+    "לחיצה אחת מתמללת את כל הרצף",
+    "מזהה את שפת הדיבור אוטומטית",
+    "מילוי ציר הזמן סוגר כל רווח"
+  ],
+  "screenshot": "smartcaptions/feature-1-he.png",
+  "cta": "נסיון חינם ב-smartcaptions.co.il",
+  "formatWidth": 1080,
+  "formatHeight": 1920
+}
