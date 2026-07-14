@@ -129,6 +129,11 @@ if (argv.includes('--trim-head')) {
     throw new Error(`trim-head: ${propsPath} has no telemetry.events array`);
   }
   const cutMs = Math.round(secs * 1000);
+  if (cutMs >= data.telemetry.durationMs) {
+    throw new Error(
+      `trim-head: ${secs}s (${cutMs}ms) meets or exceeds video duration ${data.telemetry.durationMs}ms`,
+    );
+  }
   const before = data.telemetry.events.length;
   data.telemetry.events = data.telemetry.events
     .filter((e) => e.t >= cutMs)
@@ -392,6 +397,7 @@ try {
     brandId: 'smartcaptions',
     video: `smartcaptions/${videoSuffix}`,
     cta: IS_HE ? 'נסיון חינם ב-smartcaptions.co.il' : 'Try free at smartcaptions.co.il',
+    locale: IS_HE ? LOCALE : null,
     telemetry,
   };
   writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
