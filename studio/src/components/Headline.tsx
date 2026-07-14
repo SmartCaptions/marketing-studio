@@ -1,18 +1,21 @@
 import React from 'react';
 import {AbsoluteFill, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
-import {loadBrandFonts} from '../lib/fonts';
+import {loadLocaleFonts} from '../lib/fonts';
 import {entrance} from '../lib/motion';
 import {revealFragment, revealUnit} from '../lib/textReveal';
 import {useFormat} from '../lib/layout';
+import {localeDir} from '../lib/locale';
 
 const easeOutExpo = Easing.out(Easing.exp);
 
-export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}> = ({kicker, headline, brand}) => {
+export const Headline: React.FC<{kicker: string; headline: string; brand: Brand; locale?: string | null}> = ({kicker, headline, brand, locale}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const {scale, width, safe} = useFormat();
-  const fonts = loadBrandFonts(brand);
+  const fonts = loadLocaleFonts(brand, locale);
+  const dir = localeDir(locale);
+  const rtl = dir === 'rtl';
   const words = headline.split(' ');
   const preset = brand.motion.textReveal;
   const byChar = revealUnit(preset, headline) === 'char';
@@ -42,6 +45,8 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}
           letterSpacing: '0.35em',
           color: brand.colors.brand,
           opacity: kickerIn,
+          direction: dir,
+          textAlign: 'center',
         }}
       >
         {kicker.toUpperCase()}
@@ -51,13 +56,15 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}
           display: 'flex',
           flexWrap: 'wrap',
           justifyContent: 'center',
+          flexDirection: rtl ? 'row-reverse' : 'row',
           gap: `0 ${Math.round(28 * scale)}px`,
           maxWidth: Math.min(1500, width - 2 * safe.left),
+          direction: dir,
         }}
       >
         {words.map((w, i) => {
           if (!byChar) {
-            const frag = revealFragment(preset, {frame, fps, motion: brand.motion, index: i, total: words.length, scale});
+            const frag = revealFragment(preset, {frame, fps, motion: brand.motion, index: i, total: words.length, scale, rtl});
             return (
               <span key={i} style={{...wordStyle, ...frag}}>
                 {w}
@@ -74,6 +81,7 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}
                   index: wordCharStart[i] + j,
                   total: totalChars,
                   scale,
+                  rtl,
                 });
                 return (
                   <span key={j} style={{display: 'inline-block', ...frag}}>

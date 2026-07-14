@@ -2,11 +2,12 @@ import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
-import {loadBrandFonts} from '../lib/fonts';
+import {loadLocaleFonts} from '../lib/fonts';
 import {getHeroMark} from '../brands/marks';
 import {FloatBar} from '../components/FloatBar';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {FilmGrade} from '../components/FilmGrade';
+import {localeDir} from '../lib/locale';
 
 export const animatedOgSchema = z.object({
   brandId: z.string(),
@@ -16,6 +17,9 @@ export const animatedOgSchema = z.object({
   loopSequence: z.string().nullable(),
   loopFrames: z.number().int().positive(),
   showFloatBar: z.boolean().optional(),
+  // RTL opt-in: pass a BCP-47 locale tag (e.g. 'he') to switch text direction
+  // and font to Rubik (hebrew+latin). Null/absent = LTR, byte-identical output.
+  locale: z.string().nullable().default(null),
 });
 
 type Props = z.infer<typeof animatedOgSchema>;
@@ -28,11 +32,13 @@ export const AnimatedOG: React.FC<Props> = ({
   loopSequence,
   loopFrames,
   showFloatBar,
+  locale,
 }) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadBrandFonts(brand);
+  const fonts = loadLocaleFonts(brand, locale);
+  const dir = localeDir(locale);
   const Mark = getHeroMark(brand.id);
   const cycle = frame / durationInFrames; // 0..1, and frame N == frame 0 on loop
   // triangular ping-pong: 0 -> 1 -> 0 across the loop, continuous at the seam
@@ -61,14 +67,14 @@ export const AnimatedOG: React.FC<Props> = ({
           opacity: glow,
         }}
       />
-      <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
+      <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18, direction: dir}}>
+        <div style={{display: 'flex', alignItems: 'center', flexDirection: dir === 'rtl' ? 'row-reverse' : 'row', gap: 24}}>
           <Mark size={84} color={brand.colors.brand} />
           <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
             {brand.name}
           </div>
         </div>
-        <div style={{fontFamily: fonts.body, fontSize: 30, color: brand.colors.ink2}}>{tagline}</div>
+        <div style={{fontFamily: fonts.body, fontSize: 30, color: brand.colors.ink2, textAlign: 'center', direction: dir}}>{tagline}</div>
         <div
           style={{
             fontFamily: fonts.mono,
@@ -76,6 +82,7 @@ export const AnimatedOG: React.FC<Props> = ({
             letterSpacing: '0.22em',
             color: brand.colors.profit,
             marginTop: 6,
+            direction: dir,
           }}
         >
           {cta.toUpperCase()}

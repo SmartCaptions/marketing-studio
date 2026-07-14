@@ -14,13 +14,16 @@ export const productDemoSchema = z.object({
   video: z.string().nullable(),
   cta: z.string(),
   telemetry: telemetrySchema.nullable(),
+  // RTL opt-in: pass a BCP-47 locale tag (e.g. 'he') to switch step-caption
+  // direction/font and EndCard to Rubik. Null/absent = LTR, byte-identical output.
+  locale: z.string().nullable().default(null),
 });
 
 type Props = z.infer<typeof productDemoSchema>;
 
 const STAGE_SCALE = 0.9; // 1600x1000 stage inside 1920x1080 with caption room
 
-export const ProductDemo: React.FC<Props> = ({brandId, video, cta, telemetry}) => {
+export const ProductDemo: React.FC<Props> = ({brandId, video, cta, telemetry, locale}) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -51,13 +54,14 @@ export const ProductDemo: React.FC<Props> = ({brandId, video, cta, telemetry}) =
                 label={activeStep.label}
                 brand={brand}
                 enteredMsAgo={timeMs - activeStep.t}
+                locale={locale}
               />
             </div>
           ) : null}
         </AbsoluteFill>
       </Sequence>
       <Sequence from={bodyFrames}>
-        <EndCard cta={cta} brand={brand} />
+        <EndCard cta={cta} brand={brand} locale={locale} />
       </Sequence>
       <div style={{position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={frame / (durationInFrames - 1)} brand={brand} width={640} />

@@ -29,6 +29,8 @@ export type RevealArgs = {
   index: number;
   total: number;
   scale: number;
+  /** When true, maskWipe clips from the right so the wipe travels RTL. */
+  rtl?: boolean;
 };
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
@@ -43,10 +45,14 @@ const spring = ({frame, fps, motion, index, scale}: RevealArgs): RevealFragment 
   return {opacity: s, transform: `translateY(${(1 - s) * 40 * scale}px)`};
 };
 
-// Terse, mechanical: a hard left->right clip wipe carried by the brand's spring easing.
-const maskWipe = ({frame, fps, motion, index}: RevealArgs): RevealFragment => {
+// Terse, mechanical: clip wipe carried by the brand's spring easing.
+// LTR: wipes left→right (clips from right). RTL: wipes right→left (clips from left).
+const maskWipe = ({frame, fps, motion, index, rtl}: RevealArgs): RevealFragment => {
   const s = clamp01(brandSpring(frame, fps, motion, {delayFrames: wordDelay(index, motion)}));
-  return {opacity: 1, transform: 'translateY(0px)', clipPath: `inset(0 ${(1 - s) * 100}% 0 0)`};
+  const clip = rtl
+    ? `inset(0 0 0 ${(1 - s) * 100}%)`
+    : `inset(0 ${(1 - s) * 100}% 0 0)`;
+  return {opacity: 1, transform: 'translateY(0px)', clipPath: clip};
 };
 
 // Soft focus-pull: blur 8px -> 0 with a small rise, per word.

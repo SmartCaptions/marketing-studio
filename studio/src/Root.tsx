@@ -41,6 +41,7 @@ export const RemotionRoot: React.FC = () => {
           cta: "Free in simulation",
           burnCaptions: false,
           voLines: null,
+          locale: null,
         }}
         calculateMetadata={({props}) => ({
           width: props.formatWidth ?? 1920,
@@ -60,6 +61,7 @@ export const RemotionRoot: React.FC = () => {
           video: null,
           cta: "Simulate free at noban.gg",
           telemetry: null,
+          locale: null,
         }}
         calculateMetadata={({props}) => ({
           durationInFrames: props.telemetry
@@ -127,6 +129,7 @@ export const RemotionRoot: React.FC = () => {
           heroImage: null,
           loopSequence: null,
           loopFrames: 240,
+          locale: null,
         }}
       />
     </>

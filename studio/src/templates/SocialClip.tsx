@@ -32,6 +32,9 @@ export const socialClipSchema = z.object({
   // absent for normal renders/smoke so the declared 1920x1080 is untouched.
   formatWidth: z.number().int().positive().optional(),
   formatHeight: z.number().int().positive().optional(),
+  // RTL opt-in: pass a BCP-47 locale tag (e.g. 'he') to switch text direction
+  // and font to Rubik (hebrew+latin). Null/absent = LTR, byte-identical output.
+  locale: z.string().nullable().default(null),
 });
 
 type Props = z.infer<typeof socialClipSchema>;
@@ -46,6 +49,7 @@ export const SocialClip: React.FC<Props> = ({
   cta,
   burnCaptions,
   voLines,
+  locale,
 }) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
@@ -72,7 +76,7 @@ export const SocialClip: React.FC<Props> = ({
       />
       <Sequence durationInFrames={90}>
         <AbsoluteFill style={{opacity: fadeAt(0, 90)}}>
-          <Headline kicker={kicker} headline={headline} brand={brand} />
+          <Headline kicker={kicker} headline={headline} brand={brand} locale={locale} />
         </AbsoluteFill>
       </Sequence>
       <Sequence from={78} durationInFrames={162}>
@@ -83,11 +87,12 @@ export const SocialClip: React.FC<Props> = ({
             lines={lines}
             brand={brand}
             zoom={{from: 1, to: 1.04, origin: '50% 30%'}}
+            locale={locale}
           />
         </AbsoluteFill>
       </Sequence>
       <Sequence from={228}>
-        <EndCard cta={cta} brand={brand} />
+        <EndCard cta={cta} brand={brand} locale={locale} />
       </Sequence>
       {/* progress float bar, pinned bottom */}
       <div style={{position: 'absolute', bottom: Math.max(Math.round(48 * scale), safe.bottom), left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>

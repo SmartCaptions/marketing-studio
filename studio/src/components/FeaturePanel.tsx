@@ -1,8 +1,9 @@
 import React from 'react';
 import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
-import {loadBrandFonts} from '../lib/fonts';
+import {loadLocaleFonts} from '../lib/fonts';
 import {brandSpring, staggerDelay} from '../lib/motion';
+import {localeDir} from '../lib/locale';
 
 export const FeaturePanel: React.FC<{
   screenshot: string | null;
@@ -10,11 +11,13 @@ export const FeaturePanel: React.FC<{
   brand: Brand;
   zoom?: {from: number; to: number; origin: string};
   portraitScreenshot?: string;
-}> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}, portraitScreenshot}) => {
+  locale?: string | null;
+}> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}, portraitScreenshot, locale}) => {
   const frame = useCurrentFrame();
   const {fps, width, height} = useVideoConfig();
   const isPortrait = height > width;
-  const fonts = loadBrandFonts(brand);
+  const fonts = loadLocaleFonts(brand, locale);
+  const dir = localeDir(locale);
   const panelIn = brandSpring(frame, fps, brand.motion);
   const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);
   return (
@@ -71,15 +74,19 @@ export const FeaturePanel: React.FC<{
       >
         {lines.map((line, i) => {
           const s = brandSpring(frame, fps, brand.motion, {delayFrames: 15 + staggerDelay(i, 10, brand.motion)});
+          // RTL: bullet enters from right (negative translateX)
+          const tx = dir === 'rtl' ? `translateX(${-(1 - s) * 40}px)` : `translateX(${(1 - s) * 40}px)`;
           return (
             <div
               key={i}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
+                flexDirection: dir === 'rtl' ? 'row-reverse' : 'row',
                 gap: 20,
                 opacity: s,
-                transform: `translateX(${(1 - s) * 40}px)`,
+                transform: tx,
+                direction: dir,
               }}
             >
               <div
@@ -89,6 +96,7 @@ export const FeaturePanel: React.FC<{
                   borderRadius: isPortrait ? 6 : 5,
                   background: brand.colors.brand,
                   marginTop: isPortrait ? 26 : 22,
+                  flexShrink: 0,
                 }}
               />
               <div
@@ -97,6 +105,7 @@ export const FeaturePanel: React.FC<{
                   fontWeight: 600,
                   fontSize: isPortrait ? 46 : 40,
                   color: brand.colors.ink2,
+                  textAlign: dir === 'rtl' ? 'right' : 'left',
                 }}
               >
                 {line}
