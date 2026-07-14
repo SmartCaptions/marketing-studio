@@ -1,0 +1,54 @@
+{
+  "brandId": "smartcaptions",
+  "video": "smartcaptions/demo-he.webm",
+  "cta": "נסיון חינם ב-smartcaptions.co.il",
+  "telemetry": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "durationMs": 17465,
+    "events": [
+      {
+        "type": "step",
+        "t": 406,
+        "label": "הפאנל: שפות, עיצוב, תמלול בלחיצה"
+      },
+      {
+        "type": "step",
+        "t": 3622,
+        "label": "Fill Timeline: כתוביות רצופות במתג אחד"
+      },
+      {
+        "type": "click",
+        "t": 3622,
+        "x": 651,
+        "y": 552
+      },
+      {
+        "type": "step",
+        "t": 6870,
+        "label": "מעלים אודיו ומתחיל תמלול אמיתי"
+      },
+      {
+        "type": "step",
+        "t": 10170,
+        "label": "כתוביות, מתוזמנות למילה"
+      },
+      {
+        "type": "click",
+        "t": 10170,
+        "x": 727,
+        "y": 681
+      },
+      {
+        "type": "focus",
+        "t": 12463,
+        "x": 720,
+        "y": 558,
+        "w": 1150,
+        "h": 560
+      }
+    ]
+  }
+}
