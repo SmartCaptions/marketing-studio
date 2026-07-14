@@ -15,7 +15,7 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand;
   const {scale, width, safe} = useFormat();
   const fonts = loadLocaleFonts(brand, locale);
   const dir = localeDir(locale);
-  const rtl = dir === 'rtl';
+  const rtl = dir === 'rtl'; // used by revealFragment for maskWipe clip direction
   const words = headline.split(' ');
   const preset = brand.motion.textReveal;
   const byChar = revealUnit(preset, headline) === 'char';
@@ -56,7 +56,6 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand;
           display: 'flex',
           flexWrap: 'wrap',
           justifyContent: 'center',
-          flexDirection: rtl ? 'row-reverse' : 'row',
           gap: `0 ${Math.round(28 * scale)}px`,
           maxWidth: Math.min(1500, width - 2 * safe.left),
           direction: dir,

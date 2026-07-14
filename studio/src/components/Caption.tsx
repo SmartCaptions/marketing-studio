@@ -20,7 +20,6 @@ export const Caption: React.FC<{
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        flexDirection: dir === 'rtl' ? 'row-reverse' : 'row',
         gap: 16,
         padding: '18px 32px',
         borderRadius: 12,

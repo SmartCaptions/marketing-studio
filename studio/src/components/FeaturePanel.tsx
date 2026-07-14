@@ -74,18 +74,15 @@ export const FeaturePanel: React.FC<{
       >
         {lines.map((line, i) => {
           const s = brandSpring(frame, fps, brand.motion, {delayFrames: 15 + staggerDelay(i, 10, brand.motion)});
-          // RTL: bullet enters from right (negative translateX)
-          const tx = dir === 'rtl' ? `translateX(${-(1 - s) * 40}px)` : `translateX(${(1 - s) * 40}px)`;
           return (
             <div
               key={i}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
-                flexDirection: dir === 'rtl' ? 'row-reverse' : 'row',
                 gap: 20,
                 opacity: s,
-                transform: tx,
+                transform: `translateX(${(1 - s) * 40}px)`,
                 direction: dir,
               }}
             >
