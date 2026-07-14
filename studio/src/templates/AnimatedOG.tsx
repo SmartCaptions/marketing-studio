@@ -68,7 +68,7 @@ export const AnimatedOG: React.FC<Props> = ({
         }}
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18, direction: dir}}>
-        <div style={{display: 'flex', alignItems: 'center', flexDirection: dir === 'rtl' ? 'row-reverse' : 'row', gap: 24}}>
+        <div style={{display: 'flex', alignItems: 'center', direction: 'ltr', gap: 24}}>
           <Mark size={84} color={brand.colors.brand} />
           <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
             {brand.name}
