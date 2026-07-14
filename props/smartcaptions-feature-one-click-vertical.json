@@ -1,0 +1,14 @@
+{
+  "brandId": "smartcaptions",
+  "kicker": "smartcaptions.co.il",
+  "headline": "Transcribe inside the edit",
+  "lines": [
+    "One click transcribes your whole sequence",
+    "No exports, no uploads, no round trips",
+    "Captions land straight on your timeline"
+  ],
+  "screenshot": "smartcaptions/feature-1.png",
+  "cta": "Try free at smartcaptions.co.il",
+  "formatWidth": 1080,
+  "formatHeight": 1920
+}

@@ -1,0 +1,12 @@
+{
+  "brandId": "smartcaptions",
+  "kicker": "smartcaptions.co.il",
+  "headline": "Any language, translated on the way",
+  "lines": [
+    "Auto-detects the spoken language",
+    "Translate captions as they generate",
+    "Hebrew and RTL handled properly"
+  ],
+  "screenshot": "smartcaptions/feature-2.png",
+  "cta": "Try free at smartcaptions.co.il"
+}
