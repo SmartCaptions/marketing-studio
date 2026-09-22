@@ -187,19 +187,6 @@ const HookScene: React.FC<{
           </div>
         </div>
       </AbsoluteFill>
-      {/* Bottom brand accent line */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: SAFE_BOTTOM,
-          left: SAFE_LEFT,
-          right: SAFE_RIGHT,
-          height: 3,
-          borderRadius: 2,
-          background: `linear-gradient(90deg, transparent 0%, ${brand.colors.brand} 50%, transparent 100%)`,
-          opacity: spring,
-        }}
-      />
     </AbsoluteFill>
   );
 };
