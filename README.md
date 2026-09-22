@@ -143,6 +143,88 @@ launch.py          single-command health check + Remotion Studio
 
 `out/`, `assets/`, and `studio/public/*/` are build products and stay untracked.
 
+## StoryReel — vertical short-form video
+
+`StoryReel` is a 1080×1920 portrait composition for Instagram Reels and YouTube Shorts. BrAInd calls it to produce a per-reel video for SmartCaptions from a simple job JSON.
+
+### Job format
+
+```json
+{
+  "schema_version": 1,
+  "id": "reel-001",
+  "language": "he",
+  "hook": "כתוביות לפרמייר פרו בלחיצה אחת",
+  "scenes": [
+    {
+      "kind": "image",
+      "media": "/abs/path/to/still.png",
+      "narration": "SmartCaptions מייצרת כתוביות אוטומטיות לכל סצנה בפרמייר פרו."
+    },
+    {
+      "kind": "video",
+      "media": "/abs/path/to/clip.mp4",
+      "narration": "פתח את הפאנל, בחר הגדרות, ותמלל בלחיצה אחת."
+    },
+    {
+      "kind": "output",
+      "lines": ["00:00:01,200 --> 00:00:03,400", "SmartCaptions מייצרת"],
+      "narration": "זהו הפלט של SmartCaptions."
+    }
+  ],
+  "cta": "smartcaptions.co.il",
+  "ai_disclosure": true,
+  "output_dir": "/abs/path/to/output"
+}
+```
+
+Scene kinds:
+
+| kind | `media` | `narration` | `lines` |
+|------|---------|-------------|---------|
+| `image` | path to PNG/JPG | spoken text | — |
+| `video` | path to MP4 | spoken text | — |
+| `output` | — | spoken text | 1–6 verbatim SRT lines |
+
+Language `"he"` uses `eleven_v3` model (Hebrew-certified); `"en"` uses `eleven_multilingual_v2`.
+
+### Calling render-reel
+
+```bash
+node scripts/render-reel.mjs --job /abs/path/to/job.json
+```
+
+Writes to `output_dir`:
+- `reel.mp4` — rendered video
+- `reel.srt` — caption sidecar
+- `result.json` — `{schema_version, status, video, duration_ms, captions, error}`
+
+Exit 0 on success. Non-zero means `result.json` carries the error.
+
+### Voices
+
+Add a `voices` block to `brands/smartcaptions.json`:
+
+```json
+{
+  "voices": {
+    "he": "<elevenlabs-voice-id-for-hebrew>",
+    "en": "<elevenlabs-voice-id-for-english>"
+  }
+}
+```
+
+Voice IDs default to Rachel (`21m00Tcm4TlvDq8ikWAM`). Set `ELEVENLABS_API_KEY` in `.env`.
+
+### Safe areas
+
+| Platform | Safe zone |
+|----------|-----------|
+| Instagram Reels | top/bottom 285 px inset (centre 1080×1350) |
+| YouTube Shorts | above bottom 672 px; clear of right 192 px |
+
+The composition satisfies both simultaneously: `SAFE_TOP=285`, `SAFE_BOTTOM=672`, `SAFE_RIGHT=192`, `SAFE_LEFT=32`.
+
 ## Manual controls
 
 Everything the skills do can be run by hand:
@@ -150,6 +232,7 @@ Everything the skills do can be run by hand:
 ```bash
 python launch.py                    # health checks + Remotion Studio
 node scripts/smoke.mjs              # frame-0 still of every composition
+node scripts/render-reel.mjs --job <abs-path/job.json>   # StoryReel end-to-end
 cd studio && npx remotion render LogoReveal ../out/<brand>/logo.mp4 \
   --props='{"brandId":"<brand>","cta":"..."}'
 node scripts/lint-copy.mjs props/<brand>-launch.json   # no-slop copy gate

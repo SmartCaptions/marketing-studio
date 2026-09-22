@@ -32,5 +32,9 @@
     "settle": 0.25,
     "textReveal": "maskWipe"
   },
-  "voice": "Editor-to-editor, plain and confident, no hype. Blue (#1667ff) is the brand and carries UI surfaces; the logo's orange (#f7941d) and amber (#f9b233) are energy accents for highlights and caption emphasis only, never backgrounds. Captions read as captions: high-contrast white text on dark. Premiere Pro is the stage, the panel is the tool; show the work getting shorter."
+  "voice": "Editor-to-editor, plain and confident, no hype. Blue (#1667ff) is the brand and carries UI surfaces; the logo's orange (#f7941d) and amber (#f9b233) are energy accents for highlights and caption emphasis only, never backgrounds. Captions read as captions: high-contrast white text on dark. Premiere Pro is the stage, the panel is the tool; show the work getting shorter.",
+  "voices": {
+    "he": "21m00Tcm4TlvDq8ikWAM",
+    "en": "21m00Tcm4TlvDq8ikWAM"
+  }
 }
