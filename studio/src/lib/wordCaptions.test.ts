@@ -33,6 +33,52 @@ describe('groupToPhrases', () => {
     }
   });
 
+  it('sentence-ending period causes a break at that word', () => {
+    // "Hello world. Next sentence." should split at the first period.
+    const a = makeAlignment('Hello world. Next sentence.');
+    const phrases = groupToPhrases(a, 64); // large maxChars so length is not the trigger
+    // Must have at least 2 phrases due to the period
+    expect(phrases.length).toBeGreaterThanOrEqual(2);
+    // First phrase ends with "."
+    expect(phrases[0].text).toMatch(/\.$/);
+    // "Hello world." must be the first cue (not combined with "Next")
+    expect(phrases[0].text).toBe('Hello world.');
+  });
+
+  it('sentence-ending question mark causes a break', () => {
+    const a = makeAlignment('מה עושים? ממשיכים כמובן.');
+    const phrases = groupToPhrases(a, 64);
+    expect(phrases.length).toBeGreaterThanOrEqual(2);
+    expect(phrases[0].text).toBe('מה עושים?');
+  });
+
+  it('comma break fires only when group is long enough', () => {
+    // Short text before comma: "Hi, there" → should stay in one cue (Hi < 16 chars).
+    const a = makeAlignment('Hi, there friends today');
+    const phrases = groupToPhrases(a, 64);
+    // "Hi," is only 3 chars, below COMMA_MIN_LEN, so no comma-break here
+    expect(phrases[0].text).toContain('Hi,');
+  });
+
+  it('cross-sentence cue bug: period in middle does not bleed into next cue', () => {
+    // Reproduces the real bug: "הלקוח רוצה תמלול בעברית. בתוך Premiere Pro."
+    const text = 'הלקוח רוצה תמלול בעברית. בתוך Premiere Pro.';
+    const a = makeAlignment(text, 0, 4);
+    const phrases = groupToPhrases(a, 32);
+    // No cue should cross the period boundary
+    for (const p of phrases) {
+      // A cue cannot start with "בתוך" while also containing "בעברית."
+      const hasFirstSentenceEnd = p.text.includes('בעברית.');
+      const hasNextSentenceStart = p.text.includes('בתוך');
+      expect(hasFirstSentenceEnd && hasNextSentenceStart).toBe(false);
+    }
+    // "Premiere Pro." should appear together in one cue
+    const allText = phrases.map((p) => p.text).join(' ');
+    expect(allText).toContain('Premiere Pro.');
+    const premiereCue = phrases.find((p) => p.text.includes('Premiere'));
+    expect(premiereCue?.text).toContain('Pro.');
+  });
+
   it('timing is preserved: fromMs < toMs', () => {
     const a = makeAlignment('Hello world', 0.5, 2);
     const phrases = groupToPhrases(a);

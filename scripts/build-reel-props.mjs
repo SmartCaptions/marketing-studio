@@ -71,6 +71,10 @@ const readEnv = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Caption grouping (mirrors studio/src/lib/wordCaptions.ts in plain JS)
 // ─────────────────────────────────────────────────────────────────────────────
+const SENTENCE_END = /[.?!…]$/;
+const COMMA_END = /[,،]$/;
+const COMMA_MIN_LEN = 16;
+
 /**
  * @param {string[]} characters
  * @param {number[]} startSecs
@@ -125,6 +129,12 @@ export const groupToPhrases = (characters, startSecs, endSecs, maxChars = 32) =>
     if (groupLen > 0 && needed > maxChars) flush();
     group.push(word);
     groupLen = groupLen === 0 ? word.text.length : groupLen + 1 + word.text.length;
+
+    if (SENTENCE_END.test(word.text)) {
+      flush();
+    } else if (COMMA_END.test(word.text) && groupLen >= COMMA_MIN_LEN) {
+      flush();
+    }
   }
   flush();
 

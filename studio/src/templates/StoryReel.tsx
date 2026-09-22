@@ -116,14 +116,18 @@ const HookScene: React.FC<{
   const fonts = loadLocaleFonts(brand, locale);
   const dir = isHebrew(locale) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fade(frame, 0, 8, durationFrames - 12, durationFrames);
+  // Fast entrance: text punches in from slightly below within the first 10 frames.
+  const enterY = interpolate(frame, [0, 10], [28, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const opacity = fade(frame, 0, 5, durationFrames - 10, durationFrames);
 
   return (
     <AbsoluteFill style={{opacity}}>
-      {/* Dark gradient overlay so hook text pops over any scene behind it */}
+      {/* Full dark fill so the hook reads over any image behind it */}
+      <AbsoluteFill style={{background: brand.colors.bg}} />
+      {/* Subtle brand radial wash */}
       <AbsoluteFill
         style={{
-          background: `linear-gradient(180deg, ${brand.colors.bg} 0%, ${brand.colors.bg}cc 60%, transparent 100%)`,
+          background: `radial-gradient(70% 50% at 50% 40%, ${brand.colors.brand}${alphaHex(0.15)}, transparent 70%)`,
         }}
       />
       {/* Hook text, centered in the safe zone */}
@@ -138,10 +142,10 @@ const HookScene: React.FC<{
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          gap: 20,
+          gap: 24,
         }}
       >
-        {/* Kicker line */}
+        {/* Kicker line — Latin brand name, letter-spacing is fine here */}
         <div
           style={{
             fontFamily: fonts.mono,
@@ -156,22 +160,31 @@ const HookScene: React.FC<{
         >
           {brand.name.toUpperCase()}
         </div>
-        {/* Hook headline */}
+        {/* Hook headline: large, bold, high-contrast card */}
         <div
           style={{
-            fontFamily: fonts.display,
-            fontSize: 72,
-            fontWeight: 800,
-            lineHeight: 1.1,
-            color: brand.colors.ink,
-            direction: dir,
-            textAlign: 'center',
-            maxWidth: 900,
-            transform: `scale(${0.96 + spring * 0.04})`,
-            unicodeBidi: 'plaintext',
+            background: `${brand.colors.surface}${alphaHex(0.9)}`,
+            borderRadius: 20,
+            border: `2px solid ${brand.colors.brand}${alphaHex(0.35)}`,
+            padding: '36px 44px',
+            maxWidth: 920,
+            transform: `scale(${0.97 + spring * 0.03}) translateY(${enterY}px)`,
           }}
         >
-          {hook}
+          <div
+            style={{
+              fontFamily: fonts.display,
+              fontSize: 96,
+              fontWeight: 800,
+              lineHeight: 1.15,
+              color: brand.colors.ink,
+              direction: dir,
+              textAlign: 'center',
+              unicodeBidi: 'plaintext',
+            }}
+          >
+            {hook}
+          </div>
         </div>
       </AbsoluteFill>
       {/* Bottom brand accent line */}
@@ -349,7 +362,9 @@ const AiDisclosureLabel: React.FC<{
           fontFamily: fonts.mono,
           fontSize: 22,
           fontWeight: 500,
-          letterSpacing: '0.04em',
+          // No letter-spacing on Hebrew: it spaces out individual letters and
+          // breaks the visual flow of connected script.
+          letterSpacing: isHebrew(locale) ? 'normal' : '0.04em',
           color: brand.colors.ink3,
           unicodeBidi: 'plaintext',
         }}
@@ -435,7 +450,8 @@ const OutputScene: React.FC<{
                 fontFamily: fonts.mono,
                 fontSize: 24,
                 fontWeight: 600,
-                letterSpacing: '0.06em',
+                // No letter-spacing when the label text is Hebrew.
+                letterSpacing: isHebrew(locale) ? 'normal' : '0.06em',
                 color: brand.colors.brand,
                 unicodeBidi: 'plaintext',
               }}

@@ -68,7 +68,28 @@ const extractWords = (alignment: AlignmentData): Word[] => {
 };
 
 /**
+ * Punctuation patterns for cue boundary decisions.
+ *
+ * SENTENCE_END: force a cue break after this word (highest priority).
+ *   Covers Latin periods/? /!, Hebrew geresh, and ellipsis.
+ * COMMA_END: flush the current cue when it already has substantial text.
+ *   Avoids an orphaned comma word starting the very next cue.
+ */
+const SENTENCE_END = /[.?!…]$/;
+const COMMA_END = /[,،]$/;
+/** Minimum accumulated length before a comma triggers a flush. */
+const COMMA_MIN_LEN = 16;
+
+/**
  * Group words into short display phrases.
+ *
+ * Priority order:
+ *  1. Sentence-ending punctuation (. ? ! …) — always flush immediately after.
+ *  2. Comma — flush if the current group already has ≥ COMMA_MIN_LEN chars.
+ *  3. Length — flush before adding a word that would exceed maxChars.
+ *
+ * Product names (e.g. "Premiere Pro") are kept together because the length
+ * check only fires *before* adding the word, not mid-product-name.
  *
  * @param alignment - character-level ElevenLabs alignment response
  * @param maxChars  - maximum characters per phrase line (default 32)
@@ -95,11 +116,20 @@ export const groupToPhrases = (alignment: AlignmentData, maxChars = 32): PhraseC
 
   for (const word of words) {
     const needed = groupLen === 0 ? word.text.length : groupLen + 1 + word.text.length;
+    // Length overflow: flush before this word so it starts a fresh cue.
     if (groupLen > 0 && needed > maxChars) {
       flush();
     }
     group.push(word);
     groupLen = groupLen === 0 ? word.text.length : groupLen + 1 + word.text.length;
+
+    // Sentence boundary: flush after this word.
+    if (SENTENCE_END.test(word.text)) {
+      flush();
+    } else if (COMMA_END.test(word.text) && groupLen >= COMMA_MIN_LEN) {
+      // Comma with enough preceding text: flush so the next sentence starts clean.
+      flush();
+    }
   }
   flush();
 

@@ -84,6 +84,20 @@ describe('groupToPhrases', () => {
     }
   });
 
+  it('sentence period causes a break even under maxChars', () => {
+    const text = 'הלקוח רוצה תמלול בעברית. בתוך Premiere Pro.';
+    const {characters: c, start, end} = makeAlignment(text, 4);
+    const phrases = groupToPhrases(c, start, end, 64); // large maxChars
+    // Period must split the two sentences
+    for (const p of phrases) {
+      const crossesPeriod = p.text.includes('בעברית.') && p.text.includes('בתוך');
+      assert.ok(!crossesPeriod, `cue crosses sentence boundary: "${p.text}"`);
+    }
+    // "Premiere Pro." should stay together in a single cue
+    const premiereCue = phrases.find((p) => p.text.includes('Premiere'));
+    assert.ok(premiereCue?.text.includes('Pro.'), '"Premiere Pro." split across cues');
+  });
+
   it('phrases together cover full narration text', () => {
     const text = 'Open the panel pick settings and transcribe your sequence';
     const {characters: c, start, end} = makeAlignment(text, 4);
