@@ -17,7 +17,7 @@
  * Exit non-zero → result.json status "failed", error field set
  */
 import {execSync, spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildReelProps} from './build-reel-props.mjs';
@@ -43,6 +43,29 @@ const measureMs = (file) => {
     timeout: 60_000,
   });
   return parseFfprobeDuration(`${proc.stdout}\n${proc.stderr}`);
+};
+
+/**
+ * Measure the integrated loudness (LUFS) of an audio/video file using ffmpeg's
+ * loudnorm filter in analysis mode. Returns null when ffmpeg is unavailable or
+ * the output cannot be parsed.
+ */
+const measureLufs = (file) => {
+  const proc = spawnSync('ffmpeg', [
+    '-i', resolve(file),
+    '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json',
+    '-f', 'null', '-',
+  ], {encoding: 'utf8', timeout: 120_000});
+  const combined = `${proc.stdout ?? ''}\n${proc.stderr ?? ''}`;
+  const match = combined.match(/\{[\s\S]*?\}/);
+  if (!match) return null;
+  try {
+    const j = JSON.parse(match[0]);
+    const v = parseFloat(j.input_i);
+    return isFinite(v) ? v : null;
+  } catch {
+    return null;
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,6 +162,55 @@ const main = async () => {
   if (!existsSync(reelMp4)) {
     writeResult('failed', {error: 'Remotion exited 0 but reel.mp4 was not produced.'});
     process.exit(1);
+  }
+
+  // ─── Step 2.5: Loudness normalisation (EBU R128 −14 LUFS / −1.5 dBTP) ───
+  const LUFS_TARGET = -14;
+  const LUFS_TP_TARGET = -1.5;
+  const LUFS_TOLERANCE = 1.5; // ±1.5 LU
+  try {
+    console.log('[render-reel] loudnorm pass 1: measuring…');
+    const p1 = spawnSync('ffmpeg', [
+      '-i', reelMp4,
+      '-af', `loudnorm=I=${LUFS_TARGET}:TP=${LUFS_TP_TARGET}:LRA=11:print_format=json`,
+      '-f', 'null', '-',
+    ], {encoding: 'utf8', timeout: 120_000});
+    const combined1 = `${p1.stdout ?? ''}\n${p1.stderr ?? ''}`;
+    const match1 = combined1.match(/\{[\s\S]*?\}/);
+    if (!match1) throw new Error('loudnorm pass 1: no JSON in output');
+    const ln = JSON.parse(match1[0]);
+    console.log(`[render-reel] measured I=${ln.input_i} LUFS, TP=${ln.input_tp} dBTP, LRA=${ln.input_lra}`);
+
+    console.log('[render-reel] loudnorm pass 2: applying…');
+    const normMp4 = join(outputDir, 'reel-norm.mp4');
+    const filter = [
+      `loudnorm=I=${LUFS_TARGET}:TP=${LUFS_TP_TARGET}:LRA=11`,
+      `measured_I=${ln.input_i}:measured_TP=${ln.input_tp}`,
+      `measured_LRA=${ln.input_lra}:measured_thresh=${ln.input_thresh}`,
+      `offset=${ln.target_offset}:linear=true:print_format=summary`,
+    ].join(':');
+    const p2 = spawnSync('ffmpeg', [
+      '-i', reelMp4,
+      '-af', filter,
+      '-c:v', 'copy',
+      '-y', normMp4,
+    ], {encoding: 'utf8', timeout: 120_000});
+    if (p2.status !== 0) throw new Error(`ffmpeg pass 2 exited ${p2.status}: ${(p2.stderr ?? '').slice(0, 300)}`);
+
+    renameSync(normMp4, reelMp4);
+
+    // Verify: measure again and assert within tolerance.
+    const postLufs = measureLufs(reelMp4);
+    if (postLufs !== null) {
+      const delta = Math.abs(postLufs - LUFS_TARGET);
+      if (delta > LUFS_TOLERANCE) {
+        console.warn(`[render-reel] loudness check WARNING: integrated=${postLufs.toFixed(1)} LUFS, target=${LUFS_TARGET}, delta=${delta.toFixed(1)} LU > ±${LUFS_TOLERANCE} LU`);
+      } else {
+        console.log(`[render-reel] loudness OK: integrated=${postLufs.toFixed(1)} LUFS (target=${LUFS_TARGET}, delta=${delta.toFixed(1)} LU ≤ ±${LUFS_TOLERANCE} LU)`);
+      }
+    }
+  } catch (err) {
+    console.warn(`[render-reel] loudness normalisation failed (non-fatal): ${err.message}`);
   }
 
   // ─── Step 3: SRT sidecar ─────────────────────────────────────────────────

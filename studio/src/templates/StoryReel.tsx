@@ -39,6 +39,7 @@ import {brandSpring} from '../lib/motion';
 import {getHeroMark} from '../brands/marks';
 import {phrasesToFrameCues} from '../lib/wordCaptions';
 import type {PhraseCue} from '../lib/wordCaptions';
+import {fixHebrewPrefixHyphen} from '../lib/bidi';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schema
@@ -183,7 +184,7 @@ const HookScene: React.FC<{
               unicodeBidi: 'plaintext',
             }}
           >
-            {hook}
+            {fixHebrewPrefixHyphen(hook)}
           </div>
         </div>
       </AbsoluteFill>
@@ -299,7 +300,7 @@ const SceneCaptions: React.FC<{
             unicodeBidi: 'plaintext',
           }}
         >
-          {activeCue.text}
+          {fixHebrewPrefixHyphen(activeCue.text)}
         </div>
       </div>
     </div>
@@ -468,7 +469,7 @@ const OutputScene: React.FC<{
                 marginBottom: idx < lines.length - 1 ? 16 : 0,
               }}
             >
-              {line}
+              {fixHebrewPrefixHyphen(line)}
             </div>
           ))}
         </div>
