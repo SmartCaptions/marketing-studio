@@ -154,7 +154,7 @@ launch.py          single-command health check + Remotion Studio
   "schema_version": 1,
   "id": "reel-001",
   "language": "he",
-  "hook": "כתוביות לפרמייר פרו בלחיצה אחת",
+  "hook": "כתוביות בעברית מתוך התמליל של Premiere Pro",
   "scenes": [
     {
       "kind": "image",
@@ -164,7 +164,7 @@ launch.py          single-command health check + Remotion Studio
     {
       "kind": "video",
       "media": "/abs/path/to/clip.mp4",
-      "narration": "פתח את הפאנל, בחר הגדרות, ותמלל בלחיצה אחת."
+      "narration": "SmartCaptions מתמלל עברית ישירות לפאנל ה-Text של Premiere Pro."
     },
     {
       "kind": "output",

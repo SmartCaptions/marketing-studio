@@ -199,6 +199,39 @@ const getVoiceId = (brandJson, language) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Narration helper — shared by image, video, and output scene branches
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Generate TTS audio for one scene's narration, write it to disk, and derive
+ * caption cues from the word-level alignment.
+ *
+ * @param {{narration: string, sceneIndex: number, label?: string, voiceId: string,
+ *          modelId: string, apiKey: string, reelPublicDir: string}} opts
+ * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array}>}
+ */
+const processNarration = async ({narration, sceneIndex, label, voiceId, modelId, apiKey, reelPublicDir}) => {
+  const tag = label ? ` (${label})` : '';
+  console.log(`[build-reel-props] scene ${sceneIndex}${tag}: TTS "${narration.slice(0, 60)}…"`);
+
+  const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(narration, voiceId, modelId, apiKey);
+
+  const audioAbs = join(reelPublicDir, `scene-${sceneIndex}.mp3`);
+  writeFileSync(audioAbs, audioBuffer);
+  const audioRelative = relative(STUDIO_PUBLIC, audioAbs);
+
+  const captions = alignment
+    ? groupToPhrases(
+        alignment.characters,
+        alignment.character_start_times_seconds,
+        alignment.character_end_times_seconds,
+      )
+    : [];
+
+  console.log(`[build-reel-props] scene ${sceneIndex}: ${durationMs}ms, ${captions.length} caption phrases`);
+  return {audioRelative, durationMs, captions};
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
 export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} = {}) => {
@@ -249,28 +282,15 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       }
 
       // Still needs voice-over narration
-      console.log(`[build-reel-props] scene ${i} (output): TTS "${scene.narration.slice(0, 60)}…"`);
-      const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(
-        scene.narration,
+      const {audioRelative, durationMs, captions} = await processNarration({
+        narration: scene.narration,
+        sceneIndex: i,
+        label: 'output',
         voiceId,
         modelId,
         apiKey,
-      );
-
-      const audioName = `scene-${i}.mp3`;
-      const audioAbs = join(reelPublicDir, audioName);
-      writeFileSync(audioAbs, audioBuffer);
-      const audioRelative = relative(STUDIO_PUBLIC, audioAbs);
-
-      const captions = alignment
-        ? groupToPhrases(
-            alignment.characters,
-            alignment.character_start_times_seconds,
-            alignment.character_end_times_seconds,
-          )
-        : [];
-
-      console.log(`[build-reel-props] scene ${i}: ${durationMs}ms, ${captions.length} caption phrases`);
+        reelPublicDir,
+      });
 
       processedScenes.push({
         kind: 'output',
@@ -298,29 +318,14 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
     const mediaRelative = relative(STUDIO_PUBLIC, destAbs);
 
     // Generate voice-over for this scene
-    console.log(`[build-reel-props] scene ${i}: TTS "${scene.narration.slice(0, 60)}…"`);
-    const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(
-      scene.narration,
+    const {audioRelative, durationMs, captions} = await processNarration({
+      narration: scene.narration,
+      sceneIndex: i,
       voiceId,
       modelId,
       apiKey,
-    );
-
-    const audioName = `scene-${i}.mp3`;
-    const audioAbs = join(reelPublicDir, audioName);
-    writeFileSync(audioAbs, audioBuffer);
-    const audioRelative = relative(STUDIO_PUBLIC, audioAbs);
-
-    // Derive caption phrases from word-level alignment
-    const captions = alignment
-      ? groupToPhrases(
-          alignment.characters,
-          alignment.character_start_times_seconds,
-          alignment.character_end_times_seconds,
-        )
-      : [];
-
-    console.log(`[build-reel-props] scene ${i}: ${durationMs}ms, ${captions.length} caption phrases`);
+      reelPublicDir,
+    });
 
     processedScenes.push({
       kind: scene.kind,
