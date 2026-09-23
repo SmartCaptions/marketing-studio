@@ -7,6 +7,7 @@ import { ProductDemo, productDemoSchema } from "./templates/ProductDemo";
 import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
+import { StoryReel, storyReelSchema } from "./templates/StoryReel";
 import { launchTiming } from "./lib/launchTiming";
 
 export const RemotionRoot: React.FC = () => {
@@ -130,6 +131,46 @@ export const RemotionRoot: React.FC = () => {
           loopSequence: null,
           loopFrames: 240,
           locale: null,
+        }}
+      />
+      {/* StoryReel: 1080×1920 portrait reel for Instagram Reels / YouTube Shorts.
+          Duration is computed from scene narration lengths via calculateMetadata.
+          Default props render without network (no audio, placeholder scene). */}
+      <Composition
+        id="StoryReel"
+        component={StoryReel}
+        durationInFrames={90}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={storyReelSchema}
+        defaultProps={{
+          brandId: "smartcaptions",
+          language: "he" as const,
+          hook: "כתוביות לפרמייר פרו בלחיצה אחת",
+          cta: "smartcaptions.co.il",
+          aiDisclosure: false,
+          hookDurationMs: 1000,
+          endCardDurationMs: 2000,
+          scenes: [
+            {
+              kind: "image" as const,
+              media: "smartcaptions/placeholder.png",
+              audioSrc: null,
+              audioDurationMs: 3000,
+              captions: [],
+            },
+          ],
+        }}
+        calculateMetadata={({props}) => {
+          const fps = 30;
+          const hookFrames = Math.ceil((props.hookDurationMs / 1000) * fps);
+          const endFrames = Math.ceil((props.endCardDurationMs / 1000) * fps);
+          const sceneFrames = props.scenes.reduce(
+            (sum, s) => sum + Math.ceil((s.audioDurationMs / 1000) * fps),
+            0,
+          );
+          return {durationInFrames: hookFrames + sceneFrames + endFrames};
         }}
       />
     </>
