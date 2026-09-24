@@ -253,7 +253,7 @@ const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; bran
   brandId,
 }) => {
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const text =
     language === 'he' ? 'הוויזואליה נוצרה בבינה מלאכותית' : 'AI-generated visuals';
@@ -338,7 +338,7 @@ const ShotCaptions: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const FADE = 4;
 
@@ -346,9 +346,12 @@ const ShotCaptions: React.FC<{
   const active = cues.find((c) => frame >= c.fromFrame && frame < c.toFrame) ?? null;
   if (!active) return null;
 
+  // Clamp fade to half the cue duration — short cues (< 2×FADE frames) would
+  // produce a non-monotonic input array and crash interpolate.
+  const safeFade = Math.min(FADE, Math.floor((active.toFrame - active.fromFrame) / 2));
   const opacity = interpolate(
     frame,
-    [active.fromFrame, active.fromFrame + FADE, active.toFrame - FADE, active.toFrame],
+    [active.fromFrame, active.fromFrame + safeFade, active.toFrame - safeFade, active.toFrame],
     [0, 1, 1, 0],
     {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
   );
@@ -602,7 +605,7 @@ const TitleShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
@@ -661,14 +664,14 @@ const TitleShot: React.FC<{
   };
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        opacity,
+        position: 'absolute',
         top: SAFE_TOP,
         bottom: SAFE_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        position: 'absolute',
+        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -676,6 +679,7 @@ const TitleShot: React.FC<{
         gap: 28,
         direction: dir,
         transform: `translateY(${(1 - spring) * 24}px)`,
+        overflow: 'hidden',
       }}
     >
       {renderHeading()}
@@ -699,7 +703,7 @@ const TitleShot: React.FC<{
           {fixHebrewPrefixHyphen(line)}
         </div>
       ))}
-    </AbsoluteFill>
+    </div>
   );
 };
 
@@ -716,7 +720,7 @@ const ChatShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
@@ -729,20 +733,21 @@ const ChatShot: React.FC<{
   const textColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink2;
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        opacity,
+        position: 'absolute',
         top: SAFE_TOP,
         bottom: SAFE_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        position: 'absolute',
+        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         gap: 32,
         direction: dir,
+        overflow: 'hidden',
       }}
     >
       {/* Heading above bubble */}
@@ -820,7 +825,7 @@ const ChatShot: React.FC<{
           {shot.sender}
         </div>
       )}
-    </AbsoluteFill>
+    </div>
   );
 };
 
@@ -837,7 +842,7 @@ const StepsShot: React.FC<{
   const frame = useCurrentFrame();
   useVideoConfig(); // consumed for Remotion render context; fps not needed here
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
@@ -849,20 +854,21 @@ const StepsShot: React.FC<{
   const crossProgress = clamp01((frame - crossStart) / 18);
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        opacity,
+        position: 'absolute',
         top: SAFE_TOP,
         bottom: SAFE_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        position: 'absolute',
+        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         gap: 24,
         direction: dir,
+        overflow: 'hidden',
       }}
     >
       {shot.heading && (
@@ -974,7 +980,7 @@ const StepsShot: React.FC<{
           }}
         />
       )}
-    </AbsoluteFill>
+    </div>
   );
 };
 
@@ -991,7 +997,7 @@ const CompareShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
@@ -1056,19 +1062,20 @@ const CompareShot: React.FC<{
   };
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        opacity,
+        position: 'absolute',
         top: SAFE_TOP,
         bottom: SAFE_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        position: 'absolute',
+        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         gap: 32,
         direction: dir,
+        overflow: 'hidden',
       }}
     >
       {shot.heading && (
@@ -1094,7 +1101,7 @@ const CompareShot: React.FC<{
         {shot.left && renderColumn(shot.left, 'loss', 6)}
         {shot.right && renderColumn(shot.right, 'safe', 14)}
       </div>
-    </AbsoluteFill>
+    </div>
   );
 };
 
@@ -1111,27 +1118,28 @@ const QuestionShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        opacity,
+        position: 'absolute',
         top: SAFE_TOP,
         bottom: SAFE_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        position: 'absolute',
+        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         gap: 36,
         direction: dir,
+        overflow: 'hidden',
       }}
     >
       {shot.heading && (
@@ -1173,7 +1181,7 @@ const QuestionShot: React.FC<{
           {fixHebrewPrefixHyphen(line)}
         </div>
       ))}
-    </AbsoluteFill>
+    </div>
   );
 };
 
@@ -1191,7 +1199,7 @@ const RecordingShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
@@ -1416,7 +1424,7 @@ const ClipShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
@@ -1519,7 +1527,7 @@ const EndShot: React.FC<{
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadHybridPostFonts(look);
+  const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fadeRange(frame, 0, 12, durationFrames - 8, durationFrames);

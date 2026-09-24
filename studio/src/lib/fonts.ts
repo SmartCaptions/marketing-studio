@@ -88,12 +88,14 @@ export const loadLocaleFonts = (brand: Brand, locale?: string | null) => {
  * Collage look: Suez One for display headings (editorial serif), Rubik for body,
  * Amatic SC for handwritten label-tape captions and sticky-note labels.
  */
-export const loadHybridPostFonts = (look: 'studio' | 'collage') => {
+export const loadHybridPostFonts = (look: 'studio' | 'collage', language?: 'he' | 'en') => {
   if (look === 'collage') {
     return {
       display: resolve('Suez One'),
       body: resolve('Rubik'),
-      label: resolve('Amatic SC'),
+      // Amatic SC is the handwritten label-tape feel for Hebrew/collage captions.
+      // For English it turns into small-caps that are hard to read — use Rubik instead.
+      label: language === 'en' ? resolve('Rubik') : resolve('Amatic SC'),
       mono: resolve('Geist Mono'),
     };
   }

@@ -292,11 +292,14 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       // When media is pre-cropped: the staged file starts at t=0.
       // Set end_s to the staged clip's actual duration (endS - startS) so the
       // component can slow it down to fill the narration if needed.
+      // Always pass crop regardless of mediaCropped — RecordingShot uses it to
+      // derive the correct card aspect ratio; CroppedVideo ignores it when
+      // mediaCropped=true and renders the pre-cropped file full-frame instead.
       start_s: mediaCropped ? 0 : (shot.start_s ?? undefined),
       end_s: mediaCropped
         ? ((shot.end_s ?? 0) - (shot.start_s ?? 0))
         : (shot.end_s ?? undefined),
-      crop: mediaCropped ? undefined : (shot.crop ?? undefined),
+      crop: shot.crop ?? undefined,
       mediaCropped,
       label: shot.label ?? undefined,
       note: shot.note ?? undefined,
