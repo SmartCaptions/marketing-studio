@@ -228,8 +228,11 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   const modelId = MODEL_FOR_LANG[job.language];
   console.log(`[build-post-props] language=${job.language} voice=${voiceId} model=${modelId}`);
 
-  // 3. Public media dir
-  const postId = job.id ?? `post-${Date.now()}`;
+  // 3. Public media dir — derive a unique staging directory from job.id AND the
+  //    last segment of output_dir so two jobs sharing the same id (but different
+  //    output dirs) never overwrite each other's staged files.
+  const outDirLeaf = resolve(outputDir).split('/').filter(Boolean).pop() ?? 'out';
+  const postId = `${job.id ?? `post-${Date.now()}`}--${outDirLeaf}`;
   const postPublicDir = join(STUDIO_PUBLIC, 'posts', postId);
   mkdirSync(postPublicDir, {recursive: true});
 

@@ -1561,13 +1561,16 @@ const EndShot: React.FC<{
         />
       )}
 
-      <AbsoluteFill
+      {/* Plain div — not AbsoluteFill — so bottom: SAFE_BOTTOM is respected.
+          AbsoluteFill injects height: 100% which overrides the bottom constraint
+          and pushes content into the caption zone. */}
+      <div
         style={{
+          position: 'absolute',
           top: SAFE_TOP,
           bottom: SAFE_BOTTOM,
           left: SAFE_LEFT,
           right: SAFE_RIGHT,
-          position: 'absolute',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -1575,6 +1578,7 @@ const EndShot: React.FC<{
           gap: 32,
           direction: dir,
           transform: `translateY(${(1 - spring) * 20}px)`,
+          overflow: 'hidden',
         }}
       >
         {wordmarkEl}
@@ -1636,7 +1640,7 @@ const EndShot: React.FC<{
             {attribution}
           </div>
         )}
-      </AbsoluteFill>
+      </div>
     </AbsoluteFill>
   );
 };
