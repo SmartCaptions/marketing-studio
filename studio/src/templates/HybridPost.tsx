@@ -95,6 +95,8 @@ const shotSchema = z.object({
   start_s: z.number().optional(),
   end_s: z.number().optional(),
   crop: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+  /** When true, the staged media file is already cropped+trimmed; render it full-frame. */
+  mediaCropped: z.boolean().optional(),
   label: z.string().optional(),
   note: z.string().optional(),
   // Built by the props builder:
@@ -517,9 +519,13 @@ const MediaCard: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 const CroppedVideo: React.FC<{
   src: string;
-  /** Source pixel crop box [x0, y0, x1, y1] */
+  /** Source pixel crop box [x0, y0, x1, y1] — when provided AND preCropped is false,
+   *  the video is expected to be the full source and CSS transform is used to crop it.
+   *  When preCropped is true, the media is already cropped and rendered full-frame. */
   crop?: [number, number, number, number] | null;
-  /** Source start offset in seconds */
+  /** When true, the staged file is already cropped; render it at width×height with objectFit: cover. */
+  preCropped?: boolean;
+  /** Source start offset in seconds (ignored when preCropped is true) */
   startFrom?: number;
   /** Displayed width in px */
   width: number;
@@ -527,8 +533,12 @@ const CroppedVideo: React.FC<{
   height: number;
   /** Playback rate (default 1) */
   playbackRate?: number;
-}> = ({src, crop, startFrom = 0, width, height, playbackRate = 1}) => {
-  if (!crop) {
+  /** Natural dimensions of the source file — used when CSS-transforming a non-pre-cropped video */
+  sourceW?: number;
+  sourceH?: number;
+}> = ({src, crop, preCropped = false, startFrom = 0, width, height, playbackRate = 1, sourceW = 1920, sourceH = 1080}) => {
+  // Pre-cropped: the media file already contains just the crop region — render full frame.
+  if (!crop || preCropped) {
     return (
       <OffthreadVideo
         src={staticFile(src)}
@@ -540,6 +550,15 @@ const CroppedVideo: React.FC<{
     );
   }
 
+  // CSS-transform crop: shift and scale the full source so the crop region fills width×height.
+  // Only used for media that was NOT pre-cropped (e.g. clip shots with a crop that strips
+  // a small number of pixels from the source, where ffmpeg pre-crop wasn't applied).
+  //
+  // Transform order (right-to-left in CSS, transformOrigin: 0 0):
+  //   1. translate(-x0, -y0): move crop origin to (0,0)
+  //   2. scale(width/cw, height/ch): scale so crop fills display box
+  //
+  // The outer container's overflow:hidden clips the result to [0,0,width,height].
   const [x0, y0, x1, y1] = crop;
   const cw = x1 - x0;
   const ch = y1 - y0;
@@ -552,12 +571,12 @@ const CroppedVideo: React.FC<{
         src={staticFile(src)}
         style={{
           position: 'absolute',
-          // Scale the source to fill the target, then shift to expose the crop region
-          width: cw * scaleX,
-          height: ch * scaleY,
-          top: -y0 * scaleY,
-          left: -x0 * scaleX,
-          objectFit: 'fill',
+          top: 0,
+          left: 0,
+          width: sourceW,
+          height: sourceH,
+          transformOrigin: '0 0',
+          transform: `scale(${scaleX}, ${scaleY}) translate(${-x0}px, ${-y0}px)`,
         }}
         startFrom={Math.round(startFrom * 30)}
         muted
@@ -1175,8 +1194,10 @@ const RecordingShot: React.FC<{
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
-  // Card dimensions
+  // Card dimensions — derived from crop box when provided (even when media is pre-cropped,
+  // the crop aspect ratio still drives the card size).
   const crop = shot.crop ?? null;
+  const mediaCropped = shot.mediaCropped ?? false;
   let mediaW: number, mediaH: number;
   if (crop) {
     const [x0, y0, x1, y1] = crop;
@@ -1267,11 +1288,14 @@ const RecordingShot: React.FC<{
             ) : mediaSrc ? (
               <CroppedVideo
                 src={mediaSrc}
-                crop={crop}
+                crop={mediaCropped ? null : crop}
+                preCropped={mediaCropped}
                 startFrom={startFrom}
                 width={mediaW}
                 height={mediaH}
                 playbackRate={playbackRate}
+                sourceW={1920}
+                sourceH={1080}
               />
             ) : (
               <div
@@ -1398,10 +1422,13 @@ const ClipShot: React.FC<{
             >
               <CroppedVideo
                 src={mediaSrc}
-                crop={crop}
+                crop={shot.mediaCropped ? null : crop}
+                preCropped={shot.mediaCropped ?? false}
                 startFrom={startFrom}
                 width={SAFE_W - 40}
                 height={Math.round((SAFE_W - 40) * 16 / 9)}
+                sourceW={1080}
+                sourceH={1920}
               />
             </MediaCard>
           </div>

@@ -15,6 +15,7 @@
 import {existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from 'node:fs';
 import {dirname, basename, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, MODEL_FOR_LANG} from './lib/tts.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -135,16 +136,54 @@ const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey,
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Media helper
-// ─────────────────────────────────────────────────────────────────name────────
+// ─────────────────────────────────────────────────────────────────────────────
 /**
- * Copy a media file into the post's public dir and return the path relative
- * to studio/public/ for use in staticFile().
+ * Stage a media file for a shot.
+ *
+ * When `crop` and timing params are provided, uses ffmpeg to extract just the
+ * needed segment and apply the crop filter, producing a smaller file that
+ * contains exactly the pixels the component needs. The component then renders
+ * it at `objectFit: cover` with no CSS transforms required.
+ *
+ * When no crop/trim is needed, falls back to a plain file copy.
+ *
+ * Returns { mediaRelative, mediaCropped }:
+ *   mediaCropped — true when the staged file is already cropped/trimmed so the
+ *                  component should render it full-frame (start_s=0, no crop).
  */
-const stageMedia = (absPath, shotIndex, ext, postPublicDir) => {
+const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS, endS} = {}) => {
   const destName = `shot-${shotIndex}-media.${ext}`;
   const destAbs = join(postPublicDir, destName);
+
+  if (crop && Array.isArray(crop) && crop.length === 4) {
+    const [x0, y0, x1, y1] = crop;
+    const cw = x1 - x0;
+    const ch = y1 - y0;
+    const ffArgs = ['-y', '-hide_banner', '-loglevel', 'error'];
+    if (startS !== undefined && startS > 0) ffArgs.push('-ss', String(startS));
+    ffArgs.push('-i', absPath);
+    if (endS !== undefined && startS !== undefined) {
+      ffArgs.push('-t', String(endS - startS));
+    } else if (endS !== undefined) {
+      ffArgs.push('-t', String(endS));
+    }
+    ffArgs.push(
+      '-filter:v', `crop=${cw}:${ch}:${x0}:${y0}`,
+      '-an',
+      '-c:v', 'libx264', '-preset', 'ultrafast',
+      destAbs,
+    );
+    const result = spawnSync('ffmpeg', ffArgs, {timeout: 120_000, encoding: 'utf8'});
+    if (result.status === 0 && existsSync(destAbs)) {
+      console.log(`[build-post-props] shot ${shotIndex}: pre-cropped media (${cw}×${ch}) → ${destName}`);
+      return {mediaRelative: relative(STUDIO_PUBLIC, destAbs), mediaCropped: true};
+    }
+    console.warn(`[build-post-props] shot ${shotIndex}: ffmpeg crop failed, falling back to copy`);
+    console.warn(result.stderr?.slice(0, 400));
+  }
+
   copyFileSync(absPath, destAbs);
-  return relative(STUDIO_PUBLIC, destAbs);
+  return {mediaRelative: relative(STUDIO_PUBLIC, destAbs), mediaCropped: false};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,11 +257,16 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
     // Duration = narration + gap, end shot gets extra hold
     const durationMs = narrationMs + GAP_MS + (isEnd ? END_HOLD_MS : 0);
 
-    // Stage media if present
+    // Stage media if present — pre-crop with ffmpeg when crop+timing are given
     let mediaRelative = null;
+    let mediaCropped = false;
     if (shot.media) {
       const ext = shot.media.split('.').pop() ?? 'mp4';
-      mediaRelative = stageMedia(shot.media, i, ext, postPublicDir);
+      ({mediaRelative, mediaCropped} = stageMedia(shot.media, i, ext, postPublicDir, {
+        crop: shot.crop ?? undefined,
+        startS: shot.start_s ?? undefined,
+        endS: shot.end_s ?? undefined,
+      }));
     }
 
     // Steps: compute pop frames
@@ -242,9 +286,11 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       left: shot.left ?? undefined,
       right: shot.right ?? undefined,
       media: mediaRelative,
-      start_s: shot.start_s ?? undefined,
-      end_s: shot.end_s ?? undefined,
-      crop: shot.crop ?? undefined,
+      // When media is pre-cropped, the staged file starts at t=0 with no crop
+      start_s: mediaCropped ? 0 : (shot.start_s ?? undefined),
+      end_s: mediaCropped ? undefined : (shot.end_s ?? undefined),
+      crop: mediaCropped ? undefined : (shot.crop ?? undefined),
+      mediaCropped,
       label: shot.label ?? undefined,
       note: shot.note ?? undefined,
       audioSrc: audioRelative,
