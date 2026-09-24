@@ -128,7 +128,7 @@ const SAFE_BOTTOM = 672;
 const SAFE_LEFT = 32;
 const SAFE_RIGHT = 192;
 const SAFE_W = 1080 - SAFE_LEFT - SAFE_RIGHT; // 856 px
-const SAFE_H = 1920 - SAFE_TOP - SAFE_BOTTOM; // 963 px
+// const SAFE_H = 1920 - SAFE_TOP - SAFE_BOTTOM; // 963 px (kept for reference)
 // const SAFE_CX = SAFE_LEFT + SAFE_W / 2; // available for centred layouts if needed
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -259,11 +259,12 @@ const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; bran
     language === 'he' ? 'הוויזואליה נוצרה בבינה מלאכותית' : 'AI-generated visuals';
 
   if (look === 'collage') {
+    // Place in the top margin (above SAFE_TOP) so it never touches shot headings.
     return (
       <div
         style={{
           position: 'absolute',
-          top: SAFE_TOP,
+          top: 60,
           ...(dir === 'rtl' ? {right: SAFE_LEFT} : {left: SAFE_LEFT}),
           backgroundColor: COLLAGE_DARK,
           color: '#ffffff',
@@ -282,12 +283,13 @@ const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; bran
     );
   }
 
+  // Studio: anchor to top-LEFT so it never touches the top-right Watermark.
   return (
     <div
       style={{
         position: 'absolute',
-        top: SAFE_TOP,
-        ...(dir === 'rtl' ? {right: SAFE_LEFT} : {left: SAFE_LEFT}),
+        top: 60,
+        left: SAFE_LEFT,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
@@ -353,8 +355,8 @@ const ShotCaptions: React.FC<{
 
   const text = fixHebrewPrefixHyphen(active.text);
 
-  // Caption area: 60% down in the safe zone
-  const captionTop = SAFE_TOP + Math.round(SAFE_H * 0.62);
+  // Caption area: fixed zone below all visuals, above the bottom handle zone.
+  const captionTop = 1540;
 
   if (look === 'collage') {
     return (
@@ -538,11 +540,12 @@ const CroppedVideo: React.FC<{
   sourceH?: number;
 }> = ({src, crop, preCropped = false, startFrom = 0, width, height, playbackRate = 1, sourceW = 1920, sourceH = 1080}) => {
   // Pre-cropped: the media file already contains just the crop region — render full frame.
+  // Use objectFit: contain so the entire pre-cropped frame is visible without any second crop.
   if (!crop || preCropped) {
     return (
       <OffthreadVideo
         src={staticFile(src)}
-        style={{width, height, objectFit: 'cover'}}
+        style={{width, height, objectFit: 'contain'}}
         startFrom={Math.round(startFrom * 30)}
         muted
         playbackRate={playbackRate}
@@ -1194,24 +1197,49 @@ const RecordingShot: React.FC<{
   const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
-  // Card dimensions — derived from crop box when provided (even when media is pre-cropped,
-  // the crop aspect ratio still drives the card size).
+  // Layout zones for recording shots (1080×1920 coordinate space):
+  //   HEADING_ZONE:  SAFE_TOP … SAFE_TOP+HEADING_H  (only when heading present)
+  //   CARD_ZONE:     headingBottom+CARD_GAP … CAPTION_TOP-CARD_GAP
+  //   CAPTION_ZONE:  CAPTION_TOP … (bottom of screen)
+  const CAPTION_TOP_REC = 1540;
+  const HEADING_H_REC = 160;      // px reserved for a single-line heading at fontSize 68
+  const CARD_GAP = 36;
+  const CARD_MAX_W = 960;
+
+  const headingPresent = !!shot.heading;
+  const contentTop = headingPresent
+    ? SAFE_TOP + HEADING_H_REC + CARD_GAP
+    : SAFE_TOP + CARD_GAP;
+  const contentBottom = CAPTION_TOP_REC - CARD_GAP;
+  const availH = contentBottom - contentTop; // vertical space for the card
+
+  // Card dimensions — aspect ratio from crop box, width up to CARD_MAX_W.
   const crop = shot.crop ?? null;
   const mediaCropped = shot.mediaCropped ?? false;
   let mediaW: number, mediaH: number;
   if (crop) {
     const [x0, y0, x1, y1] = crop;
     const aspect = (x1 - x0) / (y1 - y0);
-    mediaW = Math.min(SAFE_W - 60, 900);
+    mediaW = CARD_MAX_W;
     mediaH = Math.round(mediaW / aspect);
-    if (mediaH > SAFE_H * 0.58) {
-      mediaH = Math.round(SAFE_H * 0.58);
+    if (mediaH > availH) {
+      mediaH = availH;
       mediaW = Math.round(mediaH * aspect);
     }
   } else {
-    mediaW = Math.min(SAFE_W - 60, 860);
+    mediaW = Math.min(CARD_MAX_W, 860);
     mediaH = Math.round(mediaW * 9 / 16);
+    if (mediaH > availH) {
+      mediaH = availH;
+      mediaW = Math.round(mediaH * 16 / 9);
+    }
   }
+
+  // Card absolute position: horizontally centred, vertically centred in the card zone.
+  const cardLeft = Math.round((1080 - mediaW) / 2);
+  const cardTop = contentTop + Math.round((availH - mediaH) / 2);
+  // Label sits just below the card.
+  const labelTop = cardTop + mediaH + 16;
 
   // Gentle push-in
   const pushScale = 1 + spring * 0.012 * (durationFrames / 90);
@@ -1234,7 +1262,7 @@ const RecordingShot: React.FC<{
 
   return (
     <AbsoluteFill style={{opacity}}>
-      {/* Heading (above card area) */}
+      {/* Heading — fixed zone at top of safe area, wraps to 90% width */}
       {shot.heading && (
         <div
           style={{
@@ -1242,98 +1270,111 @@ const RecordingShot: React.FC<{
             top: SAFE_TOP,
             left: SAFE_LEFT,
             right: SAFE_RIGHT,
-            fontFamily: fonts.display,
-            fontSize: 68,
-            fontWeight: 400,
-            color: inkColor,
-            direction: dir,
-            textAlign: 'center',
-            unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
-            maxWidth: SAFE_W,
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
+            height: HEADING_H_REC,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             opacity: spring,
           }}
         >
-          {fixHebrewPrefixHyphen(shot.heading)}
+          <div
+            style={{
+              fontFamily: fonts.display,
+              fontSize: 68,
+              fontWeight: 400,
+              color: inkColor,
+              direction: dir,
+              textAlign: 'center',
+              unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
+              maxWidth: SAFE_W * 0.9,
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+          >
+            {fixHebrewPrefixHyphen(shot.heading)}
+          </div>
         </div>
       )}
 
-      {/* Card centered in safe zone */}
+      {/* Card — absolutely positioned in the card zone */}
       <div
         style={{
           position: 'absolute',
-          top: SAFE_TOP + (shot.heading ? 140 : 0),
-          bottom: SAFE_BOTTOM + (shot.note ? 100 : 0),
-          left: SAFE_LEFT,
-          right: SAFE_RIGHT,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          top: cardTop,
+          left: cardLeft,
+          transform: `scale(${pushScale})`,
+          transformOrigin: 'center center',
         }}
       >
-        <div style={{transform: `scale(${pushScale})`}}>
-          <MediaCard
-            look={look}
-            width={mediaW}
-            height={mediaH}
-            index={shotIndex}
-            progress={spring}
-          >
-            {mediaSrc && isScreenshot ? (
-              <Img
-                src={staticFile(mediaSrc)}
-                style={{width: mediaW, height: mediaH, objectFit: 'cover'}}
-              />
-            ) : mediaSrc ? (
-              <CroppedVideo
-                src={mediaSrc}
-                crop={mediaCropped ? null : crop}
-                preCropped={mediaCropped}
-                startFrom={startFrom}
-                width={mediaW}
-                height={mediaH}
-                playbackRate={playbackRate}
-                sourceW={1920}
-                sourceH={1080}
-              />
-            ) : (
-              <div
-                style={{
-                  width: mediaW,
-                  height: mediaH,
-                  backgroundColor: brand.colors.surface2,
-                }}
-              />
-            )}
-          </MediaCard>
-        </div>
+        <MediaCard
+          look={look}
+          width={mediaW}
+          height={mediaH}
+          index={shotIndex}
+          progress={spring}
+        >
+          {mediaSrc && isScreenshot ? (
+            <Img
+              src={staticFile(mediaSrc)}
+              style={{width: mediaW, height: mediaH, objectFit: 'contain'}}
+            />
+          ) : mediaSrc ? (
+            <CroppedVideo
+              src={mediaSrc}
+              crop={mediaCropped ? null : crop}
+              preCropped={mediaCropped}
+              startFrom={startFrom}
+              width={mediaW}
+              height={mediaH}
+              playbackRate={playbackRate}
+              sourceW={1920}
+              sourceH={1080}
+            />
+          ) : (
+            <div
+              style={{
+                width: mediaW,
+                height: mediaH,
+                backgroundColor: brand.colors.surface2,
+              }}
+            />
+          )}
+        </MediaCard>
       </div>
 
-      {/* Label (top-right of card, below heading) */}
+      {/* Label — below the card, clearly separated from heading */}
       {shot.label && (
         <div
           style={{
             position: 'absolute',
-            top: SAFE_TOP + (shot.heading ? 130 : 10),
-            ...(dir === 'rtl' ? {right: SAFE_LEFT + 20} : {left: SAFE_LEFT + 20}),
-            backgroundColor:
-              look === 'collage' ? 'transparent' : `${brand.colors.surface}${alphaHex(0.9)}`,
-            border: look === 'studio' ? `1px solid ${brand.colors.line}` : 'none',
-            borderRadius: 20,
-            padding: '8px 20px',
-            fontFamily: fonts.mono,
-            fontSize: 26,
-            fontWeight: look === 'collage' ? 700 : 500,
-            color:
-              look === 'collage' ? '#b91c1c' : brand.colors.ink3,
-            direction: dir,
-            unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
-            opacity: spring,
-            maxWidth: SAFE_W - 40,
+            top: labelTop,
+            left: SAFE_LEFT,
+            right: SAFE_RIGHT,
+            display: 'flex',
+            justifyContent: dir === 'rtl' ? 'flex-end' : 'flex-start',
+            paddingLeft: dir === 'ltr' ? 20 : 0,
+            paddingRight: dir === 'rtl' ? 20 : 0,
           }}
         >
-          {shot.label}
+          <div
+            style={{
+              backgroundColor:
+                look === 'collage' ? 'transparent' : `${brand.colors.surface}${alphaHex(0.9)}`,
+              border: look === 'studio' ? `1px solid ${brand.colors.line}` : 'none',
+              borderRadius: 20,
+              padding: '8px 20px',
+              fontFamily: fonts.mono,
+              fontSize: 26,
+              fontWeight: look === 'collage' ? 700 : 500,
+              color: look === 'collage' ? '#b91c1c' : brand.colors.ink3,
+              direction: dir,
+              unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
+              opacity: spring,
+              maxWidth: SAFE_W - 40,
+            }}
+          >
+            {shot.label}
+          </div>
         </div>
       )}
 

@@ -286,9 +286,13 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       left: shot.left ?? undefined,
       right: shot.right ?? undefined,
       media: mediaRelative,
-      // When media is pre-cropped, the staged file starts at t=0 with no crop
+      // When media is pre-cropped: the staged file starts at t=0.
+      // Set end_s to the staged clip's actual duration (endS - startS) so the
+      // component can slow it down to fill the narration if needed.
       start_s: mediaCropped ? 0 : (shot.start_s ?? undefined),
-      end_s: mediaCropped ? undefined : (shot.end_s ?? undefined),
+      end_s: mediaCropped
+        ? ((shot.end_s ?? 0) - (shot.start_s ?? 0))
+        : (shot.end_s ?? undefined),
       crop: mediaCropped ? undefined : (shot.crop ?? undefined),
       mediaCropped,
       label: shot.label ?? undefined,
