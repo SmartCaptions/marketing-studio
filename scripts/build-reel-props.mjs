@@ -12,9 +12,13 @@
  * Exits 0 on success, 1 on error (error is written to result.json by render-reel.mjs).
  * Writes build-reel-props.log and reel-props.json to --out-dir.
  */
-import {createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from 'node:fs';
 import {dirname, basename, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, MODEL_FOR_LANG} from './lib/tts.mjs';
+
+// Re-export groupToPhrases so existing tests importing it from this module keep working.
+export {groupToPhrases};
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_PUBLIC = join(ROOT, 'studio', 'public');
@@ -23,180 +27,6 @@ const STUDIO_PUBLIC = join(ROOT, 'studio', 'public');
 // Job schema (mirrors contracts.md §2)
 // ─────────────────────────────────────────────────────────────────────────────
 const SCHEMA_VERSION = 1;
-
-/**
- * @typedef {{
- *   schema_version: number,
- *   id: string,
- *   language: 'he' | 'en',
- *   hook: string,
- *   scenes: Array<{media: string, kind: 'image'|'video', narration: string}>,
- *   cta: string,
- *   ai_disclosure: boolean,
- *   output_dir: string,
- * }} Job
- */
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ElevenLabs constants
-// ─────────────────────────────────────────────────────────────────────────────
-const API = 'https://api.elevenlabs.io';
-const TTS_TIMEOUT = 90_000;
-
-// Model selection per language: eleven_v3 for Hebrew (verified one-call below),
-// eleven_multilingual_v2 for English.
-const MODEL_FOR_LANG = {he: 'eleven_v3', en: 'eleven_multilingual_v2'};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// .env reader (same approach as feeders/audio/client.mjs)
-// ─────────────────────────────────────────────────────────────────────────────
-const readEnv = () => {
-  const out = {};
-  let raw;
-  try {
-    raw = readFileSync(join(ROOT, '.env'), 'utf8');
-  } catch {
-    return out;
-  }
-  for (const line of raw.split('\n')) {
-    const t = line.trim();
-    if (t && !t.startsWith('#') && t.includes('=')) {
-      const i = t.indexOf('=');
-      out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
-    }
-  }
-  return out;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Caption grouping (mirrors studio/src/lib/wordCaptions.ts in plain JS)
-// ─────────────────────────────────────────────────────────────────────────────
-const SENTENCE_END = /[.?!…]$/;
-const COMMA_END = /[,،]$/;
-const COMMA_MIN_LEN = 16;
-
-/**
- * @param {string[]} characters
- * @param {number[]} startSecs
- * @param {number[]} endSecs
- * @param {number} maxChars
- * @returns {Array<{text: string, fromMs: number, toMs: number}>}
- */
-export const groupToPhrases = (characters, startSecs, endSecs, maxChars = 32) => {
-  // 1. Extract words
-  const words = [];
-  let buf = '';
-  let wordStart = -1;
-  let wordEnd = -1;
-
-  for (let i = 0; i < characters.length; i++) {
-    const ch = characters[i];
-    if (ch === ' ' || ch === '\n' || ch === '\t') {
-      if (buf.trim()) {
-        words.push({text: buf.trim(), startMs: Math.round(wordStart * 1000), endMs: Math.round(wordEnd * 1000)});
-      }
-      buf = '';
-      wordStart = -1;
-      wordEnd = -1;
-    } else {
-      if (wordStart < 0) wordStart = startSecs[i];
-      buf += ch;
-      wordEnd = endSecs[i];
-    }
-  }
-  if (buf.trim()) {
-    words.push({text: buf.trim(), startMs: Math.round(wordStart * 1000), endMs: Math.round(wordEnd * 1000)});
-  }
-
-  // 2. Group into phrases
-  const phrases = [];
-  let group = [];
-  let groupLen = 0;
-
-  const flush = () => {
-    if (group.length === 0) return;
-    phrases.push({
-      text: group.map((w) => w.text).join(' '),
-      fromMs: group[0].startMs,
-      toMs: group[group.length - 1].endMs,
-    });
-    group = [];
-    groupLen = 0;
-  };
-
-  for (const word of words) {
-    const needed = groupLen === 0 ? word.text.length : groupLen + 1 + word.text.length;
-    if (groupLen > 0 && needed > maxChars) flush();
-    group.push(word);
-    groupLen = groupLen === 0 ? word.text.length : groupLen + 1 + word.text.length;
-
-    if (SENTENCE_END.test(word.text)) {
-      flush();
-    } else if (COMMA_END.test(word.text) && groupLen >= COMMA_MIN_LEN) {
-      flush();
-    }
-  }
-  flush();
-
-  return phrases;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ElevenLabs TTS with-timestamps call
-// ─────────────────────────────────────────────────────────────────────────────
-/**
- * @param {string} text
- * @param {string} voiceId
- * @param {string} modelId
- * @param {string} apiKey
- * @returns {Promise<{audioBuffer: Buffer, alignment: object, durationMs: number}>}
- */
-const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey) => {
-  const url = `${API}/v1/text-to-speech/${voiceId}/with-timestamps`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      text,
-      model_id: modelId,
-      output_format: 'mp3_44100_128',
-    }),
-    signal: AbortSignal.timeout(TTS_TIMEOUT),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`ElevenLabs ${res.status}: ${body.slice(0, 300)}`);
-  }
-
-  const json = await res.json();
-
-  // The with-timestamps response carries the audio as base64 and the alignment.
-  const audioBuffer = Buffer.from(json.audio_base64, 'base64');
-  const alignment = json.alignment; // {characters, character_start_times_seconds, character_end_times_seconds}
-
-  // Measure duration from the last end time
-  const endTimes = alignment?.character_end_times_seconds ?? [];
-  const durationMs = endTimes.length > 0
-    ? Math.ceil(endTimes[endTimes.length - 1] * 1000) + 200  // +200ms tail pad
-    : Math.ceil(audioBuffer.length / (44100 * 2) * 1000);    // rough fallback
-
-  return {audioBuffer, alignment, durationMs};
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Brand voices helper
-// ─────────────────────────────────────────────────────────────────────────────
-const getVoiceId = (brandJson, language) => {
-  const voices = brandJson.voices;
-  if (!voices) throw new Error(`brands/smartcaptions.json is missing a "voices" block. Add { "voices": { "he": "<voice-id>", "en": "<voice-id>" } }.`);
-  const id = voices[language];
-  if (!id) throw new Error(`brands/smartcaptions.json voices block has no entry for language "${language}". Add it.`);
-  return id;
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Narration helper — shared by image, video, and output scene branches
@@ -252,7 +82,7 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   mkdirSync(outputDir, {recursive: true});
 
   // 2. Resolve API key and voice
-  const env = readEnv();
+  const env = readEnv(ROOT);
   const apiKey = apiKeyOverride ?? env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     throw new Error('ELEVENLABS_API_KEY is not set in .env. Add it and re-run.');

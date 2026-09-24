@@ -8,6 +8,7 @@ import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
 import { StoryReel, storyReelSchema } from "./templates/StoryReel";
+import { HybridPost, hybridPostSchema } from "./templates/HybridPost";
 import { launchTiming } from "./lib/launchTiming";
 
 export const RemotionRoot: React.FC = () => {
@@ -171,6 +172,53 @@ export const RemotionRoot: React.FC = () => {
             0,
           );
           return {durationInFrames: hookFrames + sceneFrames + endFrames};
+        }}
+      />
+
+      {/* HybridPost — 1080×1920 social post with studio or collage look */}
+      <Composition
+        id="HybridPost"
+        component={HybridPost}
+        durationInFrames={270}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={hybridPostSchema}
+        defaultProps={{
+          brandId: "smartcaptions",
+          language: "he" as const,
+          look: "studio" as const,
+          aiDisclosure: false,
+          wordmarkSrc: null,
+          attribution: null,
+          shots: [
+            {
+              kind: "title" as const,
+              narration: "שיר בדיקה",
+              heading: "HybridPost",
+              lines: ["demo post"],
+              audioSrc: null,
+              audioDurationMs: 3000,
+              captions: [],
+            },
+            {
+              kind: "end" as const,
+              narration: "SmartCaptions",
+              heading: "SmartCaptions",
+              lines: ["AI Captions in Premiere Pro"],
+              audioSrc: null,
+              audioDurationMs: 4000,
+              captions: [],
+            },
+          ],
+        }}
+        calculateMetadata={({props}) => {
+          const fps = 30;
+          const totalFrames = props.shots.reduce(
+            (sum, s) => sum + Math.ceil((s.audioDurationMs / 1000) * fps),
+            0,
+          );
+          return {durationInFrames: Math.max(30, totalFrames)};
         }}
       />
     </>
