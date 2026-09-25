@@ -19,7 +19,7 @@
         "src/finish/kit.tsx"
       ],
       "@work/*": [
-        "src/finish/example/*"
+        "src/finish/example/src/*"
       ]
     }
   },

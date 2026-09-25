@@ -1,6 +1,7 @@
 /**
- * A minimal Visuals: what a finishing session's src/Visuals.tsx looks like. It type-checks the
- * @work import in the studio and is the smoke fixture for finish-render.mjs.
+ * A minimal Visuals: what a finishing session's src/Visuals.tsx looks like. This folder is a small
+ * work directory (props.json, words.json, src/): it type-checks the @work import in the studio and
+ * is the fixture scripts/smoke.mjs renders through finish-render.mjs.
  */
 import React from 'react';
 import {AbsoluteFill, Sequence, interpolate, useCurrentFrame} from 'remotion';

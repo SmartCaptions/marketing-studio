@@ -45,8 +45,8 @@ The idea's `look` is where that world starts. You may take it further.
 3. Look at stills at the moments that matter (`--frames`) and fix what you see.
 4. Render `--final` once the stills hold up.
 
-A render error tells you what to change. If an approach doesn't work, try another. You have
-about 45 minutes; finishing well within that is better than a last-minute final.
+A render error tells you what to change. If an approach doesn't work, try another. The session
+has a time limit; finishing with time to spare is better than a last-minute final.
 
 When `out/result.json` reports `done`, you are finished. Reply with one line saying what the
 video's visual idea is. If you asked for new clips instead (KIT.md, "New clips"), you are finished
