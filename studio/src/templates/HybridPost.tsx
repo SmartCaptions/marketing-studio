@@ -591,8 +591,7 @@ const TitleShot: React.FC<{
   look: 'studio' | 'collage';
   language: 'he' | 'en';
   brandId: string;
-  durationFrames: number;
-}> = ({shot, look, language, brandId, durationFrames}) => {
+}> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -704,8 +703,7 @@ const ChatShot: React.FC<{
   look: 'studio' | 'collage';
   language: 'he' | 'en';
   brandId: string;
-  durationFrames: number;
-}> = ({shot, look, language, brandId, durationFrames}) => {
+}> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -977,8 +975,7 @@ const CompareShot: React.FC<{
   look: 'studio' | 'collage';
   language: 'he' | 'en';
   brandId: string;
-  durationFrames: number;
-}> = ({shot, look, language, brandId, durationFrames}) => {
+}> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -1096,8 +1093,7 @@ const QuestionShot: React.FC<{
   look: 'studio' | 'collage';
   language: 'he' | 'en';
   brandId: string;
-  durationFrames: number;
-}> = ({shot, look, language, brandId, durationFrames}) => {
+}> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -1410,9 +1406,8 @@ const ClipShot: React.FC<{
   look: 'studio' | 'collage';
   language: 'he' | 'en';
   brandId: string;
-  durationFrames: number;
   shotIndex: number;
-}> = ({shot, look, language, brandId, durationFrames, shotIndex}) => {
+}> = ({shot, look, language, brandId, shotIndex}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -1511,10 +1506,9 @@ const EndShot: React.FC<{
   look: 'studio' | 'collage';
   language: 'he' | 'en';
   brandId: string;
-  durationFrames: number;
   wordmarkSrc: string | null;
   attribution: string | null;
-}> = ({shot, look, language, brandId, durationFrames, wordmarkSrc, attribution}) => {
+}> = ({shot, look, language, brandId, wordmarkSrc, attribution}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -1700,7 +1694,6 @@ export const HybridPost: React.FC<HybridPostProps> = ({
                   look={look}
                   language={language}
                   brandId={brandId}
-                  durationFrames={durationFrames}
                 />
               );
             case 'chat':
@@ -1710,7 +1703,6 @@ export const HybridPost: React.FC<HybridPostProps> = ({
                   look={look}
                   language={language}
                   brandId={brandId}
-                  durationFrames={durationFrames}
                 />
               );
             case 'steps':
@@ -1730,7 +1722,6 @@ export const HybridPost: React.FC<HybridPostProps> = ({
                   look={look}
                   language={language}
                   brandId={brandId}
-                  durationFrames={durationFrames}
                 />
               );
             case 'question':
@@ -1740,7 +1731,6 @@ export const HybridPost: React.FC<HybridPostProps> = ({
                   look={look}
                   language={language}
                   brandId={brandId}
-                  durationFrames={durationFrames}
                 />
               );
             case 'recording':
@@ -1762,7 +1752,6 @@ export const HybridPost: React.FC<HybridPostProps> = ({
                   look={look}
                   language={language}
                   brandId={brandId}
-                  durationFrames={durationFrames}
                   shotIndex={i}
                 />
               );
@@ -1773,7 +1762,6 @@ export const HybridPost: React.FC<HybridPostProps> = ({
                   look={look}
                   language={language}
                   brandId={brandId}
-                  durationFrames={durationFrames}
                   wordmarkSrc={wordmarkSrc}
                   attribution={attribution}
                 />
