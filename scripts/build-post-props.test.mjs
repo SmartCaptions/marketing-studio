@@ -210,4 +210,22 @@ describe('stageMedia', () => {
     assert.deepEqual([...staged.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     rmSync(dir, {recursive: true, force: true});
   });
+
+  it('cuts a recording beat to its range and crop as H.264 video', async () => {
+    const {stageMedia} = await import('./build-post-props.mjs');
+    const {spawnSync} = await import('node:child_process');
+    const dir = join(tmpdir(), `stage-video-${Date.now()}`);
+    mkdirSync(dir, {recursive: true});
+    const src = join(dir, 'rec.mp4');
+    spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=s=1920x1080:r=30', '-t', '8', '-pix_fmt', 'yuv420p', src]);
+    const out = join(dir, 'public');
+    mkdirSync(out, {recursive: true});
+    const staged = stageMedia(src, 2, 'mp4', out, {crop: [1160, 200, 1740, 1060], startS: 3.5, endS: 6});
+    assert.equal(staged.mediaCropped, true);
+    const probe = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,width,height:format=duration', '-of', 'json', join(out, 'shot-2-media.mp4')], {encoding: 'utf8'});
+    const info = JSON.parse(probe.stdout);
+    assert.deepEqual([info.streams[0].codec_name, info.streams[0].width, info.streams[0].height], ['h264', 580, 860]);
+    assert.ok(Math.abs(Number(info.format.duration) - 2.5) < 0.2, `duration ${info.format.duration}`);
+    rmSync(dir, {recursive: true, force: true});
+  });
 });

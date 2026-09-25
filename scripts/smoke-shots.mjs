@@ -169,7 +169,7 @@ for (const look of LOOKS) {
       language: look === 'studio' ? 'he' : 'en',
       look,
       aiDisclosure: false,
-      wordmarkSrc: 'smartcaptions/wordmark.png',
+      wordmarkSrc: null,
       attribution: null,
       shots: [shot],
     };

@@ -13,7 +13,7 @@
  * Exports buildPostProps() for use by render-post.mjs.
  */
 import {existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from 'node:fs';
-import {dirname, basename, join, resolve, relative} from 'node:path';
+import {dirname, basename, extname, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, MODEL_FOR_LANG} from './lib/tts.mjs';
@@ -188,22 +188,15 @@ export const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS
 // ─────────────────────────────────────────────────────────────────────────────
 // Wordmark staging
 // ─────────────────────────────────────────────────────────────────────────────
-const WORDMARK_SOURCE = '/home/moc/video-factory/brand-packs/smartcaptions/assets/smartcaptions-wordmark.png';
-const WORDMARK_DEST_REL = 'smartcaptions/wordmark.png';
-
-const stageWordmark = (postPublicDir) => {
-  const destAbs = join(STUDIO_PUBLIC, WORDMARK_DEST_REL);
-  if (!existsSync(destAbs)) {
-    if (existsSync(WORDMARK_SOURCE)) {
-      mkdirSync(join(STUDIO_PUBLIC, 'smartcaptions'), {recursive: true});
-      copyFileSync(WORDMARK_SOURCE, destAbs);
-      console.log('[build-post-props] staged wordmark to', destAbs);
-    } else {
-      console.warn('[build-post-props] wordmark source not found; end card will omit it');
-      return null;
-    }
+/** Copy the job's brand wordmark next to the post's other media, or null when the job has none on this machine */
+const stageWordmark = (source, postPublicDir) => {
+  if (!source || !existsSync(source)) {
+    console.warn(`[build-post-props] wordmark ${source ?? '(none in job)'} not found; the end card omits it`);
+    return null;
   }
-  return WORDMARK_DEST_REL;
+  const destAbs = join(postPublicDir, 'wordmark' + extname(source));
+  copyFileSync(source, destAbs);
+  return relative(STUDIO_PUBLIC, destAbs);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -236,7 +229,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   mkdirSync(postPublicDir, {recursive: true});
 
   // 4. Stage wordmark
-  const wordmarkSrc = stageWordmark(postPublicDir);
+  const wordmarkSrc = stageWordmark(job.wordmark, postPublicDir);
 
   // 5. Process shots
   const processedShots = [];
