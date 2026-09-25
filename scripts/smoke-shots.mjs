@@ -307,6 +307,8 @@ if (videoPaths.length > 0) {
   }
 }
 
+rmSync(TMP, {recursive: true, force: true});
+
 console.log(`\nSmoke total: ${passed} passed, ${failed} failed`);
 if (failures.length) {
   console.error('Failures:');
