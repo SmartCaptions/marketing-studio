@@ -122,6 +122,7 @@ export const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey) => {
 const SENTENCE_END = /[.?!…]$/;
 const COMMA_END = /[,،]$/;
 const COMMA_MIN_LEN = 16;
+const MIN_PHRASE_MS = 500;
 
 /**
  * Group ElevenLabs character-level alignment into display phrases.
@@ -195,6 +196,14 @@ export const groupToPhrases = (characters, startSecs, endSecs, maxChars = 32) =>
     }
   }
   flush();
+
+  // ElevenLabs can give a phrase's last word no time (its end equals its start). Such a phrase
+  // stays up until the next phrase starts, or for MIN_PHRASE_MS when it is the last one.
+  for (const [i, p] of phrases.entries()) {
+    if (p.toMs - p.fromMs >= MIN_PHRASE_MS) continue;
+    const next = phrases[i + 1]?.fromMs ?? Infinity;
+    p.toMs = Math.max(p.toMs, Math.min(next, p.fromMs + MIN_PHRASE_MS));
+  }
 
   return phrases;
 };

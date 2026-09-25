@@ -27,6 +27,20 @@ describe('groupToPhrases (tts.mjs)', () => {
     };
   };
 
+  it('keeps a phrase whose last word the alignment gives no time on screen until the next one starts', () => {
+    // "One two, three four." then "Five." — "three four." has zero length, as ElevenLabs v3 sometimes returns
+    const text = 'One two, three four. Five.';
+    const chars = text.split('');
+    const start = chars.map((_, i) => (i < 9 ? i * 0.1 : i < 20 ? 0.9 : 1.4 + (i - 20) * 0.1));
+    const end = chars.map((_, i) => (i < 9 ? (i + 1) * 0.1 : i < 20 ? 0.9 : 1.4 + (i - 19) * 0.1));
+    const phrases = groupToPhrases(chars, start, end, 12);
+    const zero = phrases.find((p) => p.text === 'three four.');
+    assert.ok(zero, JSON.stringify(phrases));
+    assert.equal(zero.toMs, 1400);
+    const last = groupToPhrases('Hi.'.split(''), [0.2, 0.2, 0.2], [0.2, 0.2, 0.2]);
+    assert.deepEqual(last, [{text: 'Hi.', fromMs: 200, toMs: 700}]);
+  });
+
   it('empty input returns empty array', () => {
     assert.deepEqual(groupToPhrases([], [], [], 32), []);
   });
