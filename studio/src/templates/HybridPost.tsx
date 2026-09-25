@@ -125,6 +125,9 @@ type Shot = z.infer<typeof shotSchema>;
 // ─────────────────────────────────────────────────────────────────────────────
 const SAFE_TOP = 285;
 const SAFE_BOTTOM = 672;
+// Bottom inset to align the drawn-shot content zone with the caption zone (CAPTION_TOP=1540).
+// Using SAFE_BOTTOM (672) only reached y=1248; CONTENT_BOTTOM (380) reaches y=1540.
+const CONTENT_BOTTOM = 380;
 const SAFE_LEFT = 32;
 const SAFE_RIGHT = 192;
 const SAFE_W = 1080 - SAFE_LEFT - SAFE_RIGHT; // 856 px
@@ -143,18 +146,6 @@ const easeOut3 = (x: number) => 1 - Math.pow(clamp01(1 - x), 3);
 
 const fadeIn = (frame: number, start: number, duration: number) =>
   easeOut3(easeIn(frame, start, duration));
-
-const fadeRange = (
-  frame: number,
-  inStart: number,
-  inEnd: number,
-  outStart: number,
-  outEnd: number,
-) =>
-  interpolate(frame, [inStart, inEnd, outStart, outEnd], [0, 1, 1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Look-specific design tokens (not brand colors — these are look constants)
@@ -608,7 +599,6 @@ const TitleShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   const renderHeading = () => {
@@ -668,10 +658,9 @@ const TitleShot: React.FC<{
       style={{
         position: 'absolute',
         top: SAFE_TOP,
-        bottom: SAFE_BOTTOM,
+        bottom: CONTENT_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -723,7 +712,6 @@ const ChatShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   const bubbleBg =
@@ -737,10 +725,9 @@ const ChatShot: React.FC<{
       style={{
         position: 'absolute',
         top: SAFE_TOP,
-        bottom: SAFE_BOTTOM,
+        bottom: CONTENT_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -844,7 +831,6 @@ const StepsShot: React.FC<{
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
   const items = shot.lines ?? [];
   const popFrames = shot.stepPopFrames ?? items.map((_, i) => Math.round((i / Math.max(1, items.length - 1)) * durationFrames * 0.7));
@@ -858,10 +844,9 @@ const StepsShot: React.FC<{
       style={{
         position: 'absolute',
         top: SAFE_TOP,
-        bottom: SAFE_BOTTOM,
+        bottom: CONTENT_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -1000,7 +985,6 @@ const CompareShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   const renderColumn = (side: {label: string; items: string[]}, colorKey: 'loss' | 'safe', delay: number) => {
@@ -1066,10 +1050,9 @@ const CompareShot: React.FC<{
       style={{
         position: 'absolute',
         top: SAFE_TOP,
-        bottom: SAFE_BOTTOM,
+        bottom: CONTENT_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -1121,7 +1104,6 @@ const QuestionShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   return (
@@ -1129,10 +1111,9 @@ const QuestionShot: React.FC<{
       style={{
         position: 'absolute',
         top: SAFE_TOP,
-        bottom: SAFE_BOTTOM,
+        bottom: CONTENT_BOTTOM,
         left: SAFE_LEFT,
         right: SAFE_RIGHT,
-        opacity,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -1202,7 +1183,6 @@ const RecordingShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   // Layout zones for recording shots (1080×1920 coordinate space):
@@ -1269,7 +1249,7 @@ const RecordingShot: React.FC<{
   const mediaSrc = shot.media ?? null;
 
   return (
-    <AbsoluteFill style={{opacity}}>
+    <AbsoluteFill>
       {/* Heading — fixed zone at top of safe area, wraps to 90% width */}
       {shot.heading && (
         <div
@@ -1427,7 +1407,6 @@ const ClipShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 8, durationFrames - 8, durationFrames);
 
   const startFrom = shot.start_s ?? 0;
   const mediaSrc = shot.media ?? null;
@@ -1437,7 +1416,7 @@ const ClipShot: React.FC<{
   const crop = shot.crop ?? null;
 
   return (
-    <AbsoluteFill style={{opacity}}>
+    <AbsoluteFill>
       {/* Full-bleed video background */}
       {mediaSrc && !hasCrop ? (
         <AbsoluteFill>
@@ -1530,7 +1509,6 @@ const EndShot: React.FC<{
   const fonts = loadHybridPostFonts(look, language);
   const dir = isHebrew(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
-  const opacity = fadeRange(frame, 0, 12, durationFrames - 8, durationFrames);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
   const wordmarkEl = wordmarkSrc ? (
@@ -1559,7 +1537,7 @@ const EndShot: React.FC<{
   ) : null;
 
   return (
-    <AbsoluteFill style={{opacity}}>
+    <AbsoluteFill>
       {/* Glow / wash */}
       {look === 'studio' && (
         <AbsoluteFill
@@ -1569,14 +1547,14 @@ const EndShot: React.FC<{
         />
       )}
 
-      {/* Plain div — not AbsoluteFill — so bottom: SAFE_BOTTOM is respected.
+      {/* Plain div — not AbsoluteFill — so bottom: CONTENT_BOTTOM is respected.
           AbsoluteFill injects height: 100% which overrides the bottom constraint
           and pushes content into the caption zone. */}
       <div
         style={{
           position: 'absolute',
           top: SAFE_TOP,
-          bottom: SAFE_BOTTOM,
+          bottom: CONTENT_BOTTOM,
           left: SAFE_LEFT,
           right: SAFE_RIGHT,
           display: 'flex',

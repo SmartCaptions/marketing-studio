@@ -2,19 +2,23 @@
 /**
  * smoke-shots.mjs — verify every HybridPost shot kind renders with visible content.
  *
- * For each (kind × look) combination, constructs minimal HybridPost props with
- * a single shot of that kind, renders frame 10 using `npx remotion still`, then
- * checks that the output PNG has pixel stddev > MIN_VARIANCE (blank frames
- * have stddev ≈ 0).
+ * Phase 1 (per-shot stills): constructs minimal HybridPost props with a single
+ * shot of each kind × look, renders frame 10 via `npx remotion still`, and checks
+ * pixel stddev ≥ MIN_VARIANCE.
+ *
+ * Phase 2 (full-video scan): when video paths are passed as CLI args, samples
+ * every 0.5 s and fails if any frame's stddev is below MIN_VARIANCE. This catches
+ * blank frames caused by shot-transition bugs.
  *
  * Usage:
- *   node scripts/smoke-shots.mjs
+ *   node scripts/smoke-shots.mjs                        # phase 1 only
+ *   node scripts/smoke-shots.mjs video1.mp4 video2.mp4  # phase 1 + 2
  *
  * Exit 0 if all cases pass; exit 1 on first failure (prints which case failed).
  */
 
 import {execSync, spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, unlinkSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, rmSync, unlinkSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -192,7 +196,78 @@ for (const look of LOOKS) {
   }
 }
 
-console.log(`\nSmoke: ${passed} passed, ${failed} failed`);
+console.log(`\nSmoke phase 1: ${passed} passed, ${failed} failed`);
+
+// ─── Phase 2: full-video scan ─────────────────────────────────────────────────
+// Accept video file paths as CLI args. Sample every 0.5 s, check pixel stddev.
+const videoPaths = process.argv.slice(2).filter(p => existsSync(p));
+if (videoPaths.length > 0) {
+  console.log(`\nPhase 2: scanning ${videoPaths.length} video(s) at 0.5 s intervals...`);
+
+  const scanTmp = join(TMP, 'scan-frames');
+  mkdirSync(scanTmp, {recursive: true});
+
+  // Scan a video: extract one frame per 0.5 s in one ffmpeg pass using the
+  // select filter (every 15th frame at 30fps = every 0.5 s). This decodes
+  // frames accurately (not fast-seek) so inter-frames are correct.
+  // Returns {totalFrames, blankFrames: [{t, stddev}]}.
+  const scanVideo = (videoPath) => {
+    // 'not(mod(n,15))' selects frames 0, 15, 30, … = 0.0 s, 0.5 s, 1.0 s, …
+    // -vsync vfr ensures we get exactly the selected frames, no duplicates.
+    const ffmpeg = spawnSync('ffmpeg', [
+      '-i', videoPath,
+      '-vf', 'select=not(mod(n\\,15)),setpts=PTS-STARTPTS,format=gray,scale=256:256',
+      '-vsync', 'vfr',
+      '-f', 'rawvideo', 'pipe:',
+    ], {maxBuffer: 50 * 1024 * 1024, timeout: 120_000});
+
+    if (!ffmpeg.stdout || ffmpeg.stdout.length === 0) return [];
+
+    const frameBytes = 256 * 256;
+    const totalFrames = Math.floor(ffmpeg.stdout.length / frameBytes);
+    const blankFrames = [];
+
+    for (let i = 1; i < totalFrames; i++) { // skip i=0 (t=0.0 s): global composition fade-in is designed black
+      const frame = ffmpeg.stdout.subarray(i * frameBytes, (i + 1) * frameBytes);
+      let sum = 0, sum2 = 0;
+      for (let j = 0; j < frame.length; j++) {
+        const v = frame[j];
+        sum += v;
+        sum2 += v * v;
+      }
+      const mean = sum / frame.length;
+      const stddev = Math.sqrt(sum2 / frame.length - mean * mean);
+      const t = i * 0.5;
+      if (stddev < MIN_VARIANCE) {
+        blankFrames.push({t, stddev});
+      }
+    }
+    return {totalFrames, blankFrames};
+  };
+
+  for (const videoPath of videoPaths) {
+    const label = videoPath.replace(/.*\//, '');
+    const result = scanVideo(videoPath);
+    if (!result || result.totalFrames === 0) {
+      console.error(`[SKIP] ${label}: could not read video frames`);
+      continue;
+    }
+
+    if (result.blankFrames.length === 0) {
+      console.log(`[PASS] ${label}: no blank frames in ${result.totalFrames} samples (every 0.5 s)`);
+      passed++;
+    } else {
+      for (const {t, stddev} of result.blankFrames) {
+        const msg = `${label} @ ${t.toFixed(1)}s: blank frame — stddev=${stddev.toFixed(2)} < ${MIN_VARIANCE}`;
+        console.error(`[FAIL] ${msg}`);
+        failures.push(msg);
+      }
+      failed++;
+    }
+  }
+}
+
+console.log(`\nSmoke total: ${passed} passed, ${failed} failed`);
 if (failures.length) {
   console.error('Failures:');
   for (const f of failures) console.error(`  • ${f}`);
