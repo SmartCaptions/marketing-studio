@@ -5,6 +5,9 @@ import {loadFont as loadInter} from '@remotion/google-fonts/Inter';
 import {loadFont as loadJetBrainsMono} from '@remotion/google-fonts/JetBrainsMono';
 import {loadFont as loadLibreFranklin} from '@remotion/google-fonts/LibreFranklin';
 import {loadFont as loadRubik} from '@remotion/google-fonts/Rubik';
+import {loadFont as loadSecularOne} from '@remotion/google-fonts/SecularOne';
+import {loadFont as loadSuezOne} from '@remotion/google-fonts/SuezOne';
+import {loadFont as loadAmaticSC} from '@remotion/google-fonts/AmaticSC';
 import type {Brand} from './brand';
 
 // Load once at module scope; Remotion delays render until fonts resolve.
@@ -28,6 +31,18 @@ const families: Record<string, string> = {
   // sans-serif; no woff2 staticFile fallback is needed for server-side renders
   // since @remotion/google-fonts resolves fonts before the renderer paints.
   Rubik: loadRubik('normal', {weights: ['400', '600', '700', '800'], subsets: ['hebrew', 'latin']})
+    .fontFamily,
+  // HybridPost display faces
+  // Secular One: bold Hebrew-safe display face for the Studio look.
+  // hebrew+latin subsets; only weight 400 (the typeface has no variable axis).
+  'Secular One': loadSecularOne('normal', {weights: ['400'], subsets: ['hebrew', 'latin']})
+    .fontFamily,
+  // Suez One: editorial serif display for the Collage look.
+  // hebrew+latin subsets; only weight 400.
+  'Suez One': loadSuezOne('normal', {weights: ['400'], subsets: ['hebrew', 'latin']}).fontFamily,
+  // Amatic SC: handwritten label-tape style for Collage captions and labels.
+  // Bold only; latin subset (caption text is always short ASCII or single-lang).
+  'Amatic SC': loadAmaticSC('normal', {weights: ['400', '700'], subsets: ['latin', 'hebrew']})
     .fontFamily,
 };
 
@@ -61,5 +76,33 @@ export const loadLocaleFonts = (brand: Brand, locale?: string | null) => {
     display: resolve('Rubik'),
     body: resolve('Rubik'),
     mono: resolve(brand.fonts.mono),
+  };
+};
+
+/**
+ * HybridPost font sets.
+ *
+ * Studio look: Secular One for display headings (bold, Hebrew-safe), Rubik for body and captions,
+ * Geist Mono for labels and meta text.
+ *
+ * Collage look: Suez One for display headings (editorial serif), Rubik for body,
+ * Amatic SC for handwritten label-tape captions and sticky-note labels.
+ */
+export const loadHybridPostFonts = (look: 'studio' | 'collage', language?: 'he' | 'en') => {
+  if (look === 'collage') {
+    return {
+      display: resolve('Suez One'),
+      body: resolve('Rubik'),
+      // Amatic SC is the handwritten label-tape feel for Hebrew/collage captions.
+      // For English it turns into small-caps that are hard to read — use Rubik instead.
+      label: language === 'en' ? resolve('Rubik') : resolve('Amatic SC'),
+      mono: resolve('Geist Mono'),
+    };
+  }
+  return {
+    display: resolve('Secular One'),
+    body: resolve('Rubik'),
+    label: resolve('Geist Mono'),
+    mono: resolve('Geist Mono'),
   };
 };

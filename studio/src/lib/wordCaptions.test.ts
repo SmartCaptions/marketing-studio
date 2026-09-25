@@ -79,6 +79,18 @@ describe('groupToPhrases', () => {
     expect(premiereCue?.text).toContain('Pro.');
   });
 
+  it('keeps a phrase the alignment gives no time on screen until the next one starts, or 500 ms when last', () => {
+    // "three four." is given zero length, as ElevenLabs v3 sometimes returns; "Five." starts at 1.4 s
+    const text = 'One two, three four. Five.';
+    const chars = text.split('');
+    const start = chars.map((_, i) => (i < 9 ? i * 0.1 : i < 20 ? 0.9 : 1.4 + (i - 20) * 0.1));
+    const end = chars.map((_, i) => (i < 9 ? (i + 1) * 0.1 : i < 20 ? 0.9 : 1.4 + (i - 19) * 0.1));
+    const phrases = groupToPhrases({characters: chars, character_start_times_seconds: start, character_end_times_seconds: end}, 12);
+    expect(phrases.find((p) => p.text === 'three four.')).toMatchObject({fromMs: 900, toMs: 1400});
+    const last = groupToPhrases({characters: 'Hi.'.split(''), character_start_times_seconds: [0.2, 0.2, 0.2], character_end_times_seconds: [0.2, 0.2, 0.2]});
+    expect(last).toEqual([{text: 'Hi.', fromMs: 200, toMs: 700}]);
+  });
+
   it('timing is preserved: fromMs < toMs', () => {
     const a = makeAlignment('Hello world', 0.5, 2);
     const phrases = groupToPhrases(a);
