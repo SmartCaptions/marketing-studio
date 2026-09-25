@@ -16,7 +16,8 @@ The idea's `look` is where that world starts. You may take it further.
 ## Your working directory
 
 - `idea.json`: the idea (hook, post copy, post type, look, language) and `rules`, the promise
-  rules every shown word must pass.
+  rules every shown word must pass. When it has a `change_request`, the owner saw the last version
+  and wrote what to change; the new video follows that note.
 - `props.json`: the voice-over lines with word timings, the director's suggestion per line, and
   the media you may use.
 - The kit's reference: `KIT.md` in the kit directory you can read. `kit.tsx` and the template
