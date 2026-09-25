@@ -6,13 +6,17 @@
  *   node <marketing-studio>/scripts/finish-render.mjs --work <abs dir> --frames 0,45,300
  *   node <marketing-studio>/scripts/finish-render.mjs --work <abs dir> --frames every:30
  *   node <marketing-studio>/scripts/finish-render.mjs --work <abs dir> --final
+ *   node <marketing-studio>/scripts/finish-render.mjs --work <abs dir> --media
  *
  * The work directory holds props.json (finish-prepare.mjs), words.json and src/Visuals.tsx
  * (written by the finishing session). --frames writes PNG stills to <work>/frames/ to look at;
  * --final writes <work>/out/video.mp4 (loudness-normalised) with video.srt and
- * <work>/out/result.json in the contracts.md §2 shape, plus `ai_media`, `uses` and `words`.
+ * <work>/out/result.json in the contracts.md §2 shape, plus `ai_media`, `uses` and `words`;
+ * --media writes one still of each staged recording, screenshot or clip to <work>/media-frames/,
+ * so the session can see its footage.
  */
-import {existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {dirname, isAbsolute, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -109,6 +113,25 @@ const renderFrames = async (work, spec) => {
   }
 };
 
+/** One still per staged media: the middle of a recording or clip, a screenshot as it is */
+const renderMediaFrames = (work) => {
+  const {media} = readJson(join(work, 'props.json'), 'props.json');
+  const dir = join(work, 'media-frames');
+  mkdirSync(dir, {recursive: true});
+  for (const [key, item] of Object.entries(media)) {
+    const source = join(work, 'public', item.src);
+    const output = join(dir, `${key}.png`);
+    if (item.kind === 'screenshot') {
+      copyFileSync(source, output);
+    } else {
+      const at = String((item.durationS ?? 0) / 2);
+      const proc = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', at, '-i', source, '-frames:v', '1', output], {timeout: 60_000});
+      if (proc.status !== 0) throw new FinishError(`could not take a still of ${key}`);
+    }
+    console.log(`${output} — ${item.kind}${item.ai ? ', AI' : ''}: ${item.shows}`);
+  }
+};
+
 const renderFinal = async (work) => {
   const outDir = join(work, 'out');
   mkdirSync(outDir, {recursive: true});
@@ -147,13 +170,17 @@ const renderFinal = async (work) => {
 };
 
 const main = async () => {
+  // Remotion keeps its headless browser beside the nearest package.json; from a work directory
+  // it would download one per video
+  process.chdir(STUDIO_DIR);
   const args = process.argv.slice(2);
   const arg = (name) => (args.indexOf(name) >= 0 ? args[args.indexOf(name) + 1] : null);
   const work = arg('--work');
   const frames = arg('--frames');
   const final = args.includes('--final');
-  if (!work || !isAbsolute(work) || (!frames && !final) || (frames && final)) {
-    console.error('Usage: finish-render.mjs --work <abs dir> (--frames <n,n,…|every:n> | --final)');
+  const media = args.includes('--media');
+  if (!work || !isAbsolute(work) || [Boolean(frames), final, media].filter(Boolean).length !== 1) {
+    console.error('Usage: finish-render.mjs --work <abs dir> (--frames <n,n,…|every:n> | --final | --media)');
     process.exit(2);
   }
   if (!existsSync(join(work, 'props.json'))) {
@@ -161,6 +188,7 @@ const main = async () => {
     process.exit(2);
   }
   if (final) await renderFinal(work);
+  else if (media) renderMediaFrames(work);
   else await renderFrames(work, frames);
 };
 

@@ -4,12 +4,14 @@
  *
  * Usage (from marketing-studio root):
  *   node scripts/finish-prepare.mjs --job <abs job.json> --work <abs dir>
+ *   node scripts/finish-prepare.mjs --work <abs dir> --add <abs media.json>
  *
  * The job is the HybridPost job (docs/content-factory/contracts.md §5), optionally with
  * `extra_media` the session may also use. This voices every line (ElevenLabs, with word timings),
  * stages the media into <work>/public, and writes <work>/props.json for the Finish composition.
  * The session then writes <work>/src/Visuals.tsx and <work>/words.json and renders with
- * finish-render.mjs.
+ * finish-render.mjs. --add stages more media (the night's clips, as `[{key, path, kind, ai, label,
+ * shows}]`) into an existing work directory and adds them to its props.json.
  *
  * Prints one JSON line: {"status": "ready"|"failed", "props": path|null, "error": string|null}
  */
@@ -37,6 +39,40 @@ const probe = (file) => {
 
 const mediaKind = (kind) => (kind === 'screenshot' ? 'screenshot' : kind === 'clip' ? 'clip' : 'recording');
 
+/** Stage media beyond the director's picks into public/<folder>, keyed as given */
+const stageExtra = (entries, publicRoot, folder) => {
+  const stagedDir = join(publicRoot, folder);
+  mkdirSync(stagedDir, {recursive: true});
+  const media = {};
+  entries.forEach((extra, n) => {
+    if (!existsSync(extra.path)) throw new Error(`media not found: ${extra.path}`);
+    const ext = extra.path.split('.').pop() ?? 'mp4';
+    const {mediaRelative} = stageMedia(extra.path, `${folder}${n + 1}`, ext, stagedDir, {
+      crop: extra.crop ?? undefined,
+      startS: extra.start_s ?? undefined,
+      endS: extra.end_s ?? undefined,
+    }, publicRoot);
+    media[extra.key ?? `${folder}${n + 1}`] = {
+      src: mediaRelative,
+      kind: mediaKind(extra.kind),
+      ai: extra.ai === true,
+      label: extra.label ?? null,
+      ...probe(join(publicRoot, mediaRelative)),
+      shows: extra.shows ?? extra.label ?? extra.kind,
+    };
+  });
+  return media;
+};
+
+/** Add media (the night's clips) to a prepared work directory */
+export const addMedia = ({workDir, mediaPath}) => {
+  const propsPath = join(workDir, 'props.json');
+  const props = JSON.parse(readFileSync(propsPath, 'utf8'));
+  props.media = {...props.media, ...stageExtra(JSON.parse(readFileSync(mediaPath, 'utf8')), join(workDir, 'public'), 'night')};
+  writeFileSync(propsPath, JSON.stringify(props, null, 2));
+  return propsPath;
+};
+
 export const prepareFinish = async ({jobPath, workDir}) => {
   const job = JSON.parse(readFileSync(jobPath, 'utf8'));
   const publicRoot = join(workDir, 'public');
@@ -55,7 +91,8 @@ export const prepareFinish = async ({jobPath, workDir}) => {
         src: shot.media,
         kind: mediaKind(source.kind),
         ai: source.kind === 'clip',
-        label: source.label ?? null,
+        // A shortened recording says so, beside its real-recording label
+        label: [source.label, source.note].filter(Boolean).join(' · ') || null,
         ...probe(join(publicRoot, shot.media)),
         shows: source.shows ?? source.label ?? source.kind,
       };
@@ -76,25 +113,7 @@ export const prepareFinish = async ({jobPath, workDir}) => {
     };
   });
 
-  const stagedDir = join(publicRoot, 'extra');
-  mkdirSync(stagedDir, {recursive: true});
-  (job.extra_media ?? []).forEach((extra, n) => {
-    if (!existsSync(extra.path)) throw new Error(`extra media not found: ${extra.path}`);
-    const ext = extra.path.split('.').pop() ?? 'mp4';
-    const {mediaRelative} = stageMedia(extra.path, `x${n + 1}`, ext, stagedDir, {
-      crop: extra.crop ?? undefined,
-      startS: extra.start_s ?? undefined,
-      endS: extra.end_s ?? undefined,
-    }, publicRoot);
-    media[extra.key ?? `extra${n + 1}`] = {
-      src: mediaRelative,
-      kind: mediaKind(extra.kind),
-      ai: extra.ai === true,
-      label: extra.label ?? null,
-      ...probe(join(publicRoot, mediaRelative)),
-      shows: extra.shows ?? extra.label ?? extra.kind,
-    };
-  });
+  Object.assign(media, stageExtra(job.extra_media ?? [], publicRoot, 'extra'));
 
   const props = {
     brandId: post.brandId,
@@ -118,11 +137,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const arg = (name) => (args.indexOf(name) >= 0 ? args[args.indexOf(name) + 1] : null);
   const jobPath = arg('--job');
   const workDir = arg('--work');
-  if (!jobPath || !workDir) {
-    console.error('Usage: node scripts/finish-prepare.mjs --job <abs job.json> --work <abs dir>');
+  const addPath = arg('--add');
+  if (!workDir || (!jobPath && !addPath)) {
+    console.error('Usage: node scripts/finish-prepare.mjs (--job <abs job.json> | --add <abs media.json>) --work <abs dir>');
     process.exit(1);
   }
-  prepareFinish({jobPath: resolve(jobPath), workDir: resolve(workDir)})
+  const step = addPath
+    ? Promise.resolve().then(() => addMedia({workDir: resolve(workDir), mediaPath: resolve(addPath)}))
+    : prepareFinish({jobPath: resolve(jobPath), workDir: resolve(workDir)});
+  step
     .then((props) => console.log(JSON.stringify({status: 'ready', props, error: null})))
     .catch((err) => {
       console.log(JSON.stringify({status: 'failed', props: null, error: `Preparing the video failed: ${err.message}`}));

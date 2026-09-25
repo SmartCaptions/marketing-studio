@@ -48,10 +48,30 @@ Import from `remotion` and from `@kit`. Nothing else is installed.
 node <studio>/scripts/finish-render.mjs --work <this dir> --frames 0,45,300
 node <studio>/scripts/finish-render.mjs --work <this dir> --frames every:30
 node <studio>/scripts/finish-render.mjs --work <this dir> --final
+node <studio>/scripts/finish-render.mjs --work <this dir> --media
 ```
 
 - `--frames` writes PNG stills to `frames/` in a few seconds; look at them with Read.
 - `--final` renders `out/video.mp4` in one to three minutes and writes `out/result.json`.
+- `--media` writes one still of every staged recording, screenshot and clip to `media-frames/`,
+  so you can see your footage before choosing.
 
 A render error prints the reason: a missing word key, a media key missing from `USES`, or text
 written in the JSX.
+
+## New clips
+
+When `idea.json` says `new_clips_allowed: true` and a line needs footage none of the media
+shows, you can ask tonight's run for up to 3 new AI clips instead of rendering today:
+1. Write `clip-requests.json`: `[{"line": <voice-over line, from 1>, "still_prompt": "…",
+   "motion_prompt": "…"}]`.
+2. End without `--final`.
+
+The next morning a new session continues in this directory, with the clips as media `new1`,
+`new2`, … (about 5 s, 9:16). Using one turns on the video's AI label.
+
+- The prompts describe a scene only: no words, letters, numbers, logos, screens or software
+  interface. The factory refuses those.
+- Ask only when the video would clearly be worse without the clip; a request delays the post by
+  a day.
+

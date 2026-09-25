@@ -49,4 +49,5 @@ A render error tells you what to change. If an approach doesn't work, try anothe
 about 45 minutes; finishing well within that is better than a last-minute final.
 
 When `out/result.json` reports `done`, you are finished. Reply with one line saying what the
-video's visual idea is.
+video's visual idea is. If you asked for new clips instead (KIT.md, "New clips"), you are finished
+once `clip-requests.json` is written; reply with one line saying what the clips are for.
