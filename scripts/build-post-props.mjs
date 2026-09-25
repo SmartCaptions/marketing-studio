@@ -151,7 +151,7 @@ const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey,
  *   mediaCropped — true when the staged file is already cropped/trimmed so the
  *                  component should render it full-frame (start_s=0, no crop).
  */
-const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS, endS} = {}) => {
+export const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS, endS} = {}) => {
   const destName = `shot-${shotIndex}-media.${ext}`;
   const destAbs = join(postPublicDir, destName);
 
@@ -167,12 +167,11 @@ const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS, endS}
     } else if (endS !== undefined) {
       ffArgs.push('-t', String(endS));
     }
-    ffArgs.push(
-      '-filter:v', `crop=${cw}:${ch}:${x0}:${y0}`,
-      '-an',
-      '-c:v', 'libx264', '-preset', 'ultrafast',
-      destAbs,
-    );
+    const still = ['png', 'jpg', 'jpeg', 'webp'].includes(ext.toLowerCase());
+    ffArgs.push('-filter:v', `crop=${cw}:${ch}:${x0}:${y0}`);
+    // A screenshot is cropped to a still image; a recording or clip to a short H.264 video
+    if (still) ffArgs.push('-frames:v', '1', destAbs);
+    else ffArgs.push('-an', '-c:v', 'libx264', '-preset', 'ultrafast', destAbs);
     const result = spawnSync('ffmpeg', ffArgs, {timeout: 120_000, encoding: 'utf8'});
     if (result.status === 0 && existsSync(destAbs)) {
       console.log(`[build-post-props] shot ${shotIndex}: pre-cropped media (${cw}×${ch}) → ${destName}`);

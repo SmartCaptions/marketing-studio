@@ -179,3 +179,21 @@ describe('SRT timing', () => {
     assert.equal(msToSrtTime(ms), '01:02:03,400');
   });
 });
+
+describe('stageMedia', () => {
+  it('crops a screenshot to a real PNG (not a video in a .png name)', async () => {
+    const {stageMedia} = await import('./build-post-props.mjs');
+    const {spawnSync} = await import('node:child_process');
+    const dir = join(tmpdir(), `stage-${Date.now()}`);
+    mkdirSync(dir, {recursive: true});
+    const src = join(dir, 'panel.png');
+    spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=0x223344:s=1360x800', '-frames:v', '1', src]);
+    const out = join(dir, 'public');
+    mkdirSync(out, {recursive: true});
+    stageMedia(src, 1, 'png', out, {crop: [460, 292, 900, 778]});
+    const staged = readFileSync(join(out, 'shot-1-media.png'));
+    // PNG signature
+    assert.deepEqual([...staged.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    rmSync(dir, {recursive: true, force: true});
+  });
+});
