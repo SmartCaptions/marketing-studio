@@ -123,14 +123,14 @@ type Shot = z.infer<typeof shotSchema>;
 // ─────────────────────────────────────────────────────────────────────────────
 // Safe zone constants (1080×1920, same as StoryReel)
 // ─────────────────────────────────────────────────────────────────────────────
-const SAFE_TOP = 285;
-const SAFE_BOTTOM = 672;
+export const SAFE_TOP = 285;
+export const SAFE_BOTTOM = 672;
 // Bottom inset to align the drawn-shot content zone with the caption zone (CAPTION_TOP=1540).
 // Using SAFE_BOTTOM (672) only reached y=1248; CONTENT_BOTTOM (380) reaches y=1540.
-const CONTENT_BOTTOM = 380;
-const SAFE_LEFT = 32;
-const SAFE_RIGHT = 192;
-const SAFE_W = 1080 - SAFE_LEFT - SAFE_RIGHT; // 856 px
+export const CONTENT_BOTTOM = 380;
+export const SAFE_LEFT = 32;
+export const SAFE_RIGHT = 192;
+export const SAFE_W = 1080 - SAFE_LEFT - SAFE_RIGHT; // 856 px
 // const SAFE_H = 1920 - SAFE_TOP - SAFE_BOTTOM; // 963 px (kept for reference)
 // const SAFE_CX = SAFE_LEFT + SAFE_W / 2; // available for centred layouts if needed
 
@@ -150,10 +150,10 @@ const fadeIn = (frame: number, start: number, duration: number) =>
 // ─────────────────────────────────────────────────────────────────────────────
 // Look-specific design tokens (not brand colors — these are look constants)
 // ─────────────────────────────────────────────────────────────────────────────
-const COLLAGE_PAPER = '#f3ece0';
+export const COLLAGE_PAPER = '#f3ece0';
 const COLLAGE_PASTEL = ['#fffde7', '#fce4ec', '#e3f2fd', '#e8f5e9', '#fff3e0', '#f3e5f5'];
 const COLLAGE_TAPE_BG = '#f9d94b'; // yellow tape
-const COLLAGE_DARK = '#1f2937';
+export const COLLAGE_DARK = '#1f2937';
 
 const STUDIO_CARD_BORDER = '#1667ff';
 const STUDIO_CAPTION_BG = 'rgba(2,6,23,0.88)';
@@ -161,7 +161,7 @@ const STUDIO_CAPTION_BG = 'rgba(2,6,23,0.88)';
 // ─────────────────────────────────────────────────────────────────────────────
 // Background
 // ─────────────────────────────────────────────────────────────────────────────
-const Background: React.FC<{look: 'studio' | 'collage'; brandId: string}> = ({
+export const Background: React.FC<{look: 'studio' | 'collage'; brandId: string}> = ({
   look,
   brandId,
 }) => {
@@ -209,7 +209,7 @@ const Background: React.FC<{look: 'studio' | 'collage'; brandId: string}> = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // Persistent brand watermark (top-right, studio look only)
 // ─────────────────────────────────────────────────────────────────────────────
-const Watermark: React.FC<{look: 'studio' | 'collage'; brandId: string}> = ({
+export const Watermark: React.FC<{look: 'studio' | 'collage'; brandId: string}> = ({
   look,
   brandId,
 }) => {
@@ -238,7 +238,7 @@ const Watermark: React.FC<{look: 'studio' | 'collage'; brandId: string}> = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // AI disclosure label (shown persistently when ai_disclosure or any clip shot)
 // ─────────────────────────────────────────────────────────────────────────────
-const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; brandId: string}> = ({
+export const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; brandId: string}> = ({
   look,
   language,
   brandId,
@@ -319,7 +319,7 @@ const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; bran
 // ─────────────────────────────────────────────────────────────────────────────
 // Caption pill / label-tape overlay (per shot)
 // ─────────────────────────────────────────────────────────────────────────────
-const ShotCaptions: React.FC<{
+export const ShotCaptions: React.FC<{
   captions: PhraseCue[];
   look: 'studio' | 'collage';
   language: 'he' | 'en';
@@ -432,7 +432,7 @@ const ShotCaptions: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 // Media card wrapper (recording / screenshot)
 // ─────────────────────────────────────────────────────────────────────────────
-const MediaCard: React.FC<{
+export const MediaCard: React.FC<{
   look: 'studio' | 'collage';
   width: number;
   height: number;
@@ -513,7 +513,7 @@ const MediaCard: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 // Cropped video player (for recording and clip shots)
 // ─────────────────────────────────────────────────────────────────────────────
-const CroppedVideo: React.FC<{
+export const CroppedVideo: React.FC<{
   src: string;
   /** Source pixel crop box [x0, y0, x1, y1] — when provided AND preCropped is false,
    *  the video is expected to be the full source and CSS transform is used to crop it.

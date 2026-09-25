@@ -125,16 +125,14 @@ const COMMA_MIN_LEN = 16;
 const MIN_PHRASE_MS = 500;
 
 /**
- * Group ElevenLabs character-level alignment into display phrases.
+ * Rebuild spoken words, with their start and end in ms, from ElevenLabs character timings.
  *
  * @param {string[]} characters
  * @param {number[]} startSecs
  * @param {number[]} endSecs
- * @param {number} [maxChars=32]
- * @returns {Array<{text: string, fromMs: number, toMs: number}>}
+ * @returns {Array<{text: string, startMs: number, endMs: number}>}
  */
-export const groupToPhrases = (characters, startSecs, endSecs, maxChars = 32) => {
-  // 1. Extract words
+export const alignmentToWords = (characters, startSecs, endSecs) => {
   const words = [];
   let buf = '';
   let wordStart = -1;
@@ -167,7 +165,22 @@ export const groupToPhrases = (characters, startSecs, endSecs, maxChars = 32) =>
     });
   }
 
-  // 2. Group into phrases
+  return words;
+};
+
+/**
+ * Group ElevenLabs character-level alignment into display phrases.
+ *
+ * @param {string[]} characters
+ * @param {number[]} startSecs
+ * @param {number[]} endSecs
+ * @param {number} [maxChars=32]
+ * @returns {Array<{text: string, fromMs: number, toMs: number}>}
+ */
+export const groupToPhrases = (characters, startSecs, endSecs, maxChars = 32) => {
+  const words = alignmentToWords(characters, startSecs, endSecs);
+
+  // Group into phrases
   const phrases = [];
   let group = [];
   let groupLen = 0;

@@ -9,13 +9,25 @@ import {mkdirSync, writeFileSync, rmSync, existsSync, readFileSync} from 'node:f
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
-import {groupToPhrases} from './lib/tts.mjs';
+import {alignmentToWords, groupToPhrases} from './lib/tts.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unit tests: groupToPhrases from shared tts.mjs
 // ─────────────────────────────────────────────────────────────────────────────
+describe('alignmentToWords (tts.mjs)', () => {
+  it('rebuilds each spoken word with its start and end, for motion timed to the voice', () => {
+    const chars = 'שש פעולות'.split('');
+    const start = chars.map((_, i) => i * 0.1);
+    const end = chars.map((_, i) => (i + 1) * 0.1);
+    assert.deepEqual(alignmentToWords(chars, start, end), [
+      {text: 'שש', startMs: 0, endMs: 200},
+      {text: 'פעולות', startMs: 300, endMs: 900},
+    ]);
+  });
+});
+
 describe('groupToPhrases (tts.mjs)', () => {
   const makeAlignment = (text, durationSec = 2) => {
     const chars = text.split('');

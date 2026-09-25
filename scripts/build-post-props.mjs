@@ -16,7 +16,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from '
 import {dirname, basename, extname, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, MODEL_FOR_LANG} from './lib/tts.mjs';
+import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, alignmentToWords, MODEL_FOR_LANG} from './lib/tts.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_PUBLIC = join(ROOT, 'studio', 'public');
@@ -108,10 +108,10 @@ const calcStepPopFrames = (items, captions, durationMs, fps) => {
 
 /**
  * @param {{narration: string, shotIndex: number, voiceId: string, modelId: string,
- *           apiKey: string, postPublicDir: string}} opts
- * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array}>}
+ *           apiKey: string, postPublicDir: string, publicRoot: string}} opts
+ * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array, words: Array}>}
  */
-const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey, postPublicDir}) => {
+const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey, postPublicDir, publicRoot}) => {
   console.log(`[build-post-props] shot ${shotIndex}: TTS "${narration.slice(0, 60)}…"`);
 
   const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(
@@ -120,8 +120,15 @@ const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey,
 
   const audioAbs = join(postPublicDir, `shot-${shotIndex}.mp3`);
   writeFileSync(audioAbs, audioBuffer);
-  const audioRelative = relative(STUDIO_PUBLIC, audioAbs);
+  const audioRelative = relative(publicRoot, audioAbs);
 
+  const words = alignment
+    ? alignmentToWords(
+        alignment.characters,
+        alignment.character_start_times_seconds,
+        alignment.character_end_times_seconds,
+      )
+    : [];
   const captions = alignment
     ? groupToPhrases(
         alignment.characters,
@@ -131,7 +138,7 @@ const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey,
     : [];
 
   console.log(`[build-post-props] shot ${shotIndex}: ${durationMs}ms, ${captions.length} phrases`);
-  return {audioRelative, durationMs, captions};
+  return {audioRelative, durationMs, captions, words};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,7 +158,7 @@ const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey,
  *   mediaCropped — true when the staged file is already cropped/trimmed so the
  *                  component should render it full-frame (start_s=0, no crop).
  */
-export const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS, endS} = {}) => {
+export const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS, endS} = {}, publicRoot = STUDIO_PUBLIC) => {
   const destName = `shot-${shotIndex}-media.${ext}`;
   const destAbs = join(postPublicDir, destName);
 
@@ -175,34 +182,39 @@ export const stageMedia = (absPath, shotIndex, ext, postPublicDir, {crop, startS
     const result = spawnSync('ffmpeg', ffArgs, {timeout: 120_000, encoding: 'utf8'});
     if (result.status === 0 && existsSync(destAbs)) {
       console.log(`[build-post-props] shot ${shotIndex}: pre-cropped media (${cw}×${ch}) → ${destName}`);
-      return {mediaRelative: relative(STUDIO_PUBLIC, destAbs), mediaCropped: true};
+      return {mediaRelative: relative(publicRoot, destAbs), mediaCropped: true};
     }
     console.warn(`[build-post-props] shot ${shotIndex}: ffmpeg crop failed, falling back to copy`);
     console.warn(result.stderr?.slice(0, 400));
   }
 
   copyFileSync(absPath, destAbs);
-  return {mediaRelative: relative(STUDIO_PUBLIC, destAbs), mediaCropped: false};
+  return {mediaRelative: relative(publicRoot, destAbs), mediaCropped: false};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Wordmark staging
 // ─────────────────────────────────────────────────────────────────────────────
 /** Copy the job's brand wordmark next to the post's other media, or null when the job has none on this machine */
-const stageWordmark = (source, postPublicDir) => {
+const stageWordmark = (source, postPublicDir, publicRoot) => {
   if (!source || !existsSync(source)) {
     console.warn(`[build-post-props] wordmark ${source ?? '(none in job)'} not found; the end card omits it`);
     return null;
   }
   const destAbs = join(postPublicDir, 'wordmark' + extname(source));
   copyFileSync(source, destAbs);
-  return relative(STUDIO_PUBLIC, destAbs);
+  return relative(publicRoot, destAbs);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
-export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} = {}) => {
+/**
+ * @param {{jobPath: string, outDirOverride?: string, apiKeyOverride?: string, publicRoot?: string}} opts
+ *   publicRoot — the Remotion public directory the props' media paths are relative to. Defaults to
+ *   studio/public (HybridPost renders); a finishing work directory passes its own.
+ */
+export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, publicRoot = STUDIO_PUBLIC} = {}) => {
   // 1. Load and validate job
   const job = JSON.parse(readFileSync(resolve(jobPath), 'utf8'));
   validateJob(job);
@@ -225,11 +237,11 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   //    output dirs) never overwrite each other's staged files.
   const outDirLeaf = resolve(outputDir).split('/').filter(Boolean).pop() ?? 'out';
   const postId = `${job.id ?? `post-${Date.now()}`}--${outDirLeaf}`;
-  const postPublicDir = join(STUDIO_PUBLIC, 'posts', postId);
+  const postPublicDir = join(publicRoot, 'posts', postId);
   mkdirSync(postPublicDir, {recursive: true});
 
   // 4. Stage wordmark
-  const wordmarkSrc = stageWordmark(job.wordmark, postPublicDir);
+  const wordmarkSrc = stageWordmark(job.wordmark, postPublicDir, publicRoot);
 
   // 5. Process shots
   const processedShots = [];
@@ -240,13 +252,14 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
     const isEnd = shot.kind === 'end';
 
     // TTS narration
-    const {audioRelative, durationMs: narrationMs, captions} = await processNarration({
+    const {audioRelative, durationMs: narrationMs, captions, words} = await processNarration({
       narration: shot.narration,
       shotIndex: i,
       voiceId,
       modelId,
       apiKey,
       postPublicDir,
+      publicRoot,
     });
 
     // Duration = narration + gap, end shot gets extra hold
@@ -261,7 +274,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
         crop: shot.crop ?? undefined,
         startS: shot.start_s ?? undefined,
         endS: shot.end_s ?? undefined,
-      }));
+      }, publicRoot));
     }
 
     // Steps: compute pop frames
@@ -298,6 +311,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       audioSrc: audioRelative,
       audioDurationMs: durationMs,
       captions,
+      words,
       ...(stepPopFrames ? {stepPopFrames} : {}),
     });
   }

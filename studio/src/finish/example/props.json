@@ -1,0 +1,29 @@
+{
+  "brandId": "smartcaptions",
+  "language": "he",
+  "look": "studio",
+  "wordmarkSrc": null,
+  "attribution": null,
+  "shots": [
+    {
+      "narration": "שש פעולות לפני כתובית אחת.",
+      "audioSrc": null,
+      "audioDurationMs": 2000,
+      "captions": [{"text": "שש פעולות לפני כתובית אחת.", "fromMs": 0, "toMs": 1800}],
+      "words": [{"text": "שש", "startMs": 0, "endMs": 300}, {"text": "פעולות", "startMs": 350, "endMs": 900}],
+      "plan": {"kind": "title"}
+    },
+    {
+      "narration": "Straight into Premiere's transcript.",
+      "audioSrc": null,
+      "audioDurationMs": 2000,
+      "captions": [{"text": "Straight into Premiere's transcript.", "fromMs": 0, "toMs": 1800}],
+      "words": [{"text": "Straight", "startMs": 0, "endMs": 400}],
+      "plan": {"kind": "title"}
+    }
+  ],
+  "media": {},
+  "words": {},
+  "uses": [],
+  "aiDisclosure": false
+}

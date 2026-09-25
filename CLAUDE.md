@@ -20,6 +20,8 @@ Rules:
 - Rendered proof: visual work is not done until a rendered frame was inspected;
   final assets are not done until the user saw them.
 - Smoke check before claiming done: node scripts/smoke.mjs (every composition listed).
+- studio/src/finish is BrAInd's finishing kit (README "Finish"): its Finish composition renders only
+  through scripts/finish-render.mjs; KIT.md and BRIEF.md are what the finishing session reads.
 - Generated props JSON is edited only via its builder script (scripts/build-*-props.mjs).
 - Asset copy traces to out/<brand>/marketing/brief.json (agent-synthesized, gated by
   scripts/lint-copy.mjs and the storyboard approval); builders overlay brief copy —

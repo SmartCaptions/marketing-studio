@@ -225,6 +225,24 @@ Voice IDs default to Rachel (`21m00Tcm4TlvDq8ikWAM`). Set `ELEVENLABS_API_KEY` i
 
 The composition satisfies both simultaneously: `SAFE_TOP=285`, `SAFE_BOTTOM=672`, `SAFE_RIGHT=192`, `SAFE_LEFT=32`.
 
+## Finish — directed videos a Claude session animates
+
+BrAInd's finishing stage (MarketingContentCreation `docs/content-factory/contracts.md` §6) gives
+each directed video its own animation, written by a headless Claude Code session in a work
+directory outside this repo. This repo supplies the pieces:
+
+- `studio/src/finish/`: the `Finish` composition and the kit the session builds from. The
+  composition keeps the voice-over, word-timed captions and AI label fixed around the session's
+  visuals; `KIT.md` is the session's reference and `BRIEF.md` its brief.
+- `scripts/finish-prepare.mjs`: voices the lines (ElevenLabs, with word timings) and stages the
+  footage into the work directory. `--add` stages more footage later, such as the night's clips.
+- `scripts/finish-render.mjs`: renders a work directory. `--frames` renders stills, `--media`
+  renders a still of each piece of footage, and `--final` renders the finished MP4 with its SRT
+  and `result.json`. It refuses visuals that write text into the JSX instead of `words.json`.
+
+`Finish` is registered only by its own entry (`studio/src/finish/index.tsx`), so a work
+directory's code never enters the studio's own bundle.
+
 ## Manual controls
 
 Everything the skills do can be run by hand:
