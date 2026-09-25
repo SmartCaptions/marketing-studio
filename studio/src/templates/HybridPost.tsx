@@ -1193,12 +1193,22 @@ const RecordingShot: React.FC<{
   const HEADING_H_REC = 160;      // px reserved for a single-line heading at fontSize 68
   const CARD_GAP = 36;
   const CARD_MAX_W = 960;
+  // In collage look, MediaCard adds BORDER*2 (44) + BOTTOM_EXTRA (40) = 84 px below
+  // the video/photo, plus the ~2.2° rotation extends the visual bottom by ~25 px.
+  // These must stay above CAPTION_TOP, so we subtract them from the card zone.
+  const COLLAGE_CARD_EXTRA = 84;  // photo border height added by collage MediaCard
+  const COLLAGE_TILT_MARGIN = 25; // extra vertical reach from the rotation transform
+  const cardHExtra = look === 'collage' ? COLLAGE_CARD_EXTRA + COLLAGE_TILT_MARGIN : 0;
+  // Height of the label row (fontSize 26 + padding 8+8 + 8px gap below card visual bottom).
+  const LABEL_H_ROW = 60;
 
   const headingPresent = !!shot.heading;
   const contentTop = headingPresent
     ? SAFE_TOP + HEADING_H_REC + CARD_GAP
     : SAFE_TOP + CARD_GAP;
-  const contentBottom = CAPTION_TOP_REC - CARD_GAP;
+  // The card zone bottom is tightened to keep the entire card block (video, photo border,
+  // tilt margin, and label row) above CAPTION_TOP.
+  const contentBottom = CAPTION_TOP_REC - CARD_GAP - cardHExtra - (shot.label ? LABEL_H_ROW : 0);
   const availH = contentBottom - contentTop; // vertical space for the card
 
   // Card dimensions — aspect ratio from crop box, width up to CARD_MAX_W.
@@ -1226,8 +1236,10 @@ const RecordingShot: React.FC<{
   // Card absolute position: horizontally centred, vertically centred in the card zone.
   const cardLeft = Math.round((1080 - mediaW) / 2);
   const cardTop = contentTop + Math.round((availH - mediaH) / 2);
-  // Label sits just below the card.
-  const labelTop = cardTop + mediaH + 16;
+  // In collage look the MediaCard div extends cardHExtra px below the video area
+  // (photo border + tilt margin).  The label must sit below that visual bottom.
+  const cardVisualBottom = cardTop + mediaH + cardHExtra;
+  const labelTop = cardVisualBottom + 8;
 
   // Gentle push-in
   const pushScale = 1 + spring * 0.012 * (durationFrames / 90);

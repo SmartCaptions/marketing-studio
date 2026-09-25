@@ -131,6 +131,27 @@ print(f'{math.sqrt(var):.2f}')
   return isFinite(v) ? v : 0;
 };
 
+// ─── Recording label zone check ───────────────────────────────────────────────
+// Crops the band y=[1498, 1528] from a 1080×1920 PNG and checks low stddev.
+// This strip sits between the label tail (~y 1490 worst-case portrait collage)
+// and the caption pill's rotation bleed (~y 1533 for a collage -1° rotation).
+// Background-only: stddev < LABEL_ZONE_MAX_STDDEV.
+const LABEL_ZONE_MAX_STDDEV = 15;
+const labelZoneStddev = (pngPath) => {
+  // crop=w:h:x:y — full width (1080), 30px tall, starting at y=1498
+  const proc = spawnSync('python3', ['-c', `
+import subprocess, math, sys
+raw = subprocess.run(['ffmpeg','-i','${pngPath}','-vf','crop=1080:30:0:1498,format=gray','-vframes','1','-f','rawvideo','pipe:'],capture_output=True)
+px = list(raw.stdout)
+if not px: print(-1); sys.exit()
+mean = sum(px)/len(px)
+var = sum((x-mean)**2 for x in px)/len(px)
+print(f'{math.sqrt(var):.2f}')
+`], {encoding: 'utf8', timeout: 15_000});
+  const v = parseFloat(proc.stdout?.trim() ?? '-1');
+  return isFinite(v) ? v : -1;
+};
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 mkdirSync(TMP, {recursive: true});
 
@@ -187,6 +208,25 @@ for (const look of LOOKS) {
     } else {
       console.log(`[PASS] ${label}: stddev=${stddev.toFixed(2)}`);
       passed++;
+    }
+
+    // Extra check for recording shots: the strip y=[1490,1540] (just above the
+    // caption zone) must be background-only — no card or label pixels bleeding past
+    // CAPTION_TOP.  stddev > LABEL_ZONE_MAX_STDDEV means a card/label is there.
+    if (kind === 'recording' && existsSync(outPath)) {
+      const lz = labelZoneStddev(outPath);
+      if (lz < 0) {
+        console.warn(`[WARN] ${label}: label-zone check skipped (ffmpeg returned no data)`);
+      } else if (lz > LABEL_ZONE_MAX_STDDEV) {
+        const msg = `${label}: card/label bleeds into caption zone — label-zone stddev=${lz.toFixed(2)} > ${LABEL_ZONE_MAX_STDDEV}`;
+        console.error(`[FAIL] ${msg}`);
+        failures.push(msg);
+        failed++;
+        passed--; // undo the earlier pass count
+      } else {
+        console.log(`[PASS] ${label}: label-zone stddev=${lz.toFixed(2)} (no bleed into caption zone)`);
+        passed++;
+      }
     }
 
     // Clean up the PNG (keep props for debugging if failed)
