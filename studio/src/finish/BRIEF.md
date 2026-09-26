@@ -43,8 +43,8 @@ The idea's `look` is where that world starts. You may take it further.
 
 The composition plays a music bed automatically. You don't add audio — it is already in
 `props.json`. You may optionally place sound-effect cues by writing `cues.json`. Read the
-**Sound** section of `KIT.md` for the exact format and valid kinds. Place the riser 45 frames
-before the last line starts; it is the most effective cue. Omit `cues.json` when none of the
+**Sound** section of `KIT.md` for the exact format and valid kinds. Place the riser 60 frames
+before the last line starts (the file is 2 s = 60 frames, so it ends exactly at the last line's start); it is the most effective cue. Omit `cues.json` when none of the
 timing feels right — music alone is fine.
 
 ## How to work

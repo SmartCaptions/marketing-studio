@@ -18,7 +18,14 @@ export type SfxCue = {kind: SfxKind; frame: number};
 type Timing = {logo: Act; hook: Act; demo: Act; features: Act[]; end: Act};
 
 // Frames before the end act where the riser begins (leads into the CTA).
+// Launch-video riser: positioned so it builds up to the end card — 45 frames gives
+// a punchy 1.5 s lead-in that works with the end-card animation overlap.
 export const RISER_LEAD = 45;
+
+// Frames before the last shot where the post riser begins, derived from the riser
+// file's duration: 2.0 s × 30 fps = 60 frames.  This ensures the riser ENDS exactly
+// at the last shot's start (AC-2.2 ±5 frames).
+export const POST_RISER_LEAD = 60;
 
 // Must track FeaturePanel.tsx: benefit line `i` reveals at
 // `delayFrames = FEATURE_LINE_DELAY + staggerDelay(i, FEATURE_LINE_STAGGER, motion)`
@@ -91,10 +98,11 @@ export const postSfxCues = (
     cues.push({kind: 'swipe', frame: shotStartFrames[i]});
   }
 
-  // Riser leading into the last shot.
+  // Riser leading into the last shot: start POST_RISER_LEAD frames before so the riser
+  // ENDS exactly at the last shot's start (AC-2.2: ±5 frames; file is 2 s = 60 frames).
   if (shotStartFrames.length > 1) {
     const lastFrom = shotStartFrames[shotStartFrames.length - 1];
-    const riserFrame = Math.max(0, lastFrom - RISER_LEAD);
+    const riserFrame = Math.max(0, lastFrom - POST_RISER_LEAD);
     cues.push({kind: 'riser', frame: riserFrame});
   }
 

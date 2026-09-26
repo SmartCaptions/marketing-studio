@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {launchTiming} from './launchTiming';
 import {DEFAULT_MOTION} from './motion';
-import {RISER_LEAD, sfxCues, postSfxCues} from './sfxCues';
+import {RISER_LEAD, POST_RISER_LEAD, sfxCues, postSfxCues} from './sfxCues';
 
 // Real noban inputs: telemetry 16085ms, 2 features of 3 benefit lines each.
 const T = launchTiming(16085, 2); // demo len = ceil(16085/1000*30)+24 = 507
@@ -71,17 +71,17 @@ describe('postSfxCues', () => {
   });
 
   it('two shots: intro + riser, no swipes', () => {
-    // Shot starts at 0 and 90; riser = 90 - 45 = 45
+    // Riser starts POST_RISER_LEAD (60) frames before last shot so it ENDS at last shot start.
     const cues = postSfxCues([0, 90], 180);
     expect(cues.map((c) => c.kind).sort()).toEqual(['intro', 'riser']);
-    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(90 - RISER_LEAD);
+    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(90 - POST_RISER_LEAD);
   });
 
   it('three shots: intro + one swipe at interior boundary + riser', () => {
     const cues = postSfxCues([0, 60, 120], 180);
     expect(cues.filter((c) => c.kind === 'swipe')).toHaveLength(1);
     expect(cues.find((c) => c.kind === 'swipe')?.frame).toBe(60);
-    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(120 - RISER_LEAD);
+    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(120 - POST_RISER_LEAD);
   });
 
   it('does not add closing by default', () => {
