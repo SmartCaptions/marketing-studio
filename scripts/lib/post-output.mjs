@@ -51,7 +51,10 @@ export const normaliseLoudness = (mp4, tag) => {
       `measured_I=${ln.input_i}:measured_TP=${ln.input_tp}`,
       `measured_LRA=${ln.input_lra}:measured_thresh=${ln.input_thresh}`,
       `offset=${ln.target_offset}:linear=true:print_format=summary`,
-    ].join(':');
+    ].join(':')
+      // Effects hits outrun loudnorm's peak control and the AAC encode adds intersample peaks;
+      // a limiter 2 dB down keeps the true peak under -1 dBTP.
+      + ',alimiter=limit=0.794:level=false';
     const p2 = spawnSync('ffmpeg', ['-i', mp4, '-af', filter, '-c:v', 'copy', '-y', normMp4], {
       encoding: 'utf8',
       timeout: 120_000,
