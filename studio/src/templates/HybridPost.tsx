@@ -51,9 +51,11 @@ import {
 } from 'remotion';
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
+import {duckedVolume, resolveSfxLayers, shotVoWindows, voiceDuck} from '../lib/audioMix';
 import {loadHybridPostFonts} from '../lib/fonts';
 import {isHebrew} from '../lib/locale';
 import {brandSpring} from '../lib/motion';
+import {postSfxCues} from '../lib/sfxCues';
 import {phrasesToFrameCues} from '../lib/wordCaptions';
 import type {PhraseCue} from '../lib/wordCaptions';
 import {fixHebrewPrefixHyphen} from '../lib/bidi';
@@ -115,6 +117,22 @@ export const hybridPostSchema = z.object({
   wordmarkSrc: z.string().nullable().default(null),
   attribution: z.string().nullable().default(null),
   shots: z.array(shotSchema).min(1).max(20),
+  /** Generated music track; null when generation failed or the key is absent. */
+  music: z.object({src: z.string(), durationMs: z.number().positive()}).nullable().optional(),
+  /** Why music is absent, for the review card. */
+  musicAbsentReason: z.string().nullable().optional(),
+  /** Sound-effect cue layer. `enabled` is set by the builder only when sfx files are staged. */
+  sfx: z.object({
+    enabled: z.boolean(),
+    /** Each effect's volume, levelled to this video's voice by the props builder */
+    gains: z.record(z.string(), z.number().min(0).max(1)).optional(),
+  }).optional(),
+  /**
+   * When true, voice-over <Audio> elements are silenced but the ducking windows remain
+   * active.  Used to produce a music-and-effects-only render for level measurement
+   * (AC-2.1) without re-generating audio props.
+   */
+  muteVoice: z.boolean().optional(),
 });
 
 export type HybridPostProps = z.infer<typeof hybridPostSchema>;
@@ -1648,9 +1666,12 @@ export const HybridPost: React.FC<HybridPostProps> = ({
   wordmarkSrc,
   attribution,
   shots,
+  music,
+  sfx,
+  muteVoice = false,
 }) => {
   const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
+  const {fps, durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
 
   // Compute per-shot start frames
@@ -1663,6 +1684,14 @@ export const HybridPost: React.FC<HybridPostProps> = ({
     shotFrameCounts.push(frames);
     cursor += frames;
   }
+
+  // VO ducking windows and SFX cues for the sound layer.
+  const voWindows = shotVoWindows(shots);
+  const sfxEnabled = sfx?.enabled === true;
+  const sfxCues = sfxEnabled ? postSfxCues(shotStartFrames, durationInFrames) : [];
+  const sfxLayers = sfxEnabled
+    ? resolveSfxLayers(sfxCues, () => true, sfx?.gains)
+    : [];
 
   // Show AI disclosure when flag is set or any shot is a clip
   const showAiLabel = aiDisclosure || shots.some((s) => s.kind === 'clip');
@@ -1679,6 +1708,21 @@ export const HybridPost: React.FC<HybridPostProps> = ({
     >
       {/* Background */}
       <Background look={look} brandId={brandId} />
+
+      {/* Music bed with sidechain ducking under voice-over */}
+      {music ? (
+        <Html5Audio
+          src={staticFile(music.src)}
+          volume={(f) => duckedVolume(f, voWindows, durationInFrames)}
+        />
+      ) : null}
+
+      {/* SFX cue layer (intro, swipes, riser) */}
+      {sfxLayers.map((layer, i) => (
+        <Sequence key={`sfx-${i}`} from={layer.frame}>
+          <Html5Audio src={staticFile(layer.src)} volume={(f) => layer.volume * voiceDuck(layer.frame + f, voWindows)} />
+        </Sequence>
+      ))}
 
       {/* Shots */}
       {shots.map((shot, i) => {
@@ -1794,8 +1838,8 @@ export const HybridPost: React.FC<HybridPostProps> = ({
             >
               {ShotComponent}
 
-              {/* Voice-over audio */}
-              {shot.audioSrc ? <Html5Audio src={staticFile(shot.audioSrc)} /> : null}
+              {/* Voice-over audio (suppressed when muteVoice=true; ducking windows still active) */}
+              {shot.audioSrc && !muteVoice ? <Html5Audio src={staticFile(shot.audioSrc)} /> : null}
 
               {/* Captions */}
               <ShotCaptions

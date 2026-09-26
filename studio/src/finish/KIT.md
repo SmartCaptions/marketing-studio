@@ -59,6 +59,40 @@ node <studio>/scripts/finish-render.mjs --work <this dir> --media
 A render error prints the reason: a missing word key, a media key missing from `USES`, or text
 written in the JSX.
 
+## Sound
+
+The Finish composition renders a music bed and optional sound effects around your visuals
+automatically. You do not need to add audio yourself.
+
+**Music.** A generated music track is included in `props.json` when preparation succeeded. It
+plays from start to finish, ducked under each voice-over line. When music is absent (key missing
+or generation failed), the video renders voice-only; `props.json` has a `musicAbsentReason` field
+saying why.
+
+**Sound effects.** You may place up to one cue per scene boundary and one at the ending by
+writing `cues.json` in your work directory:
+
+```json
+[
+  {"kind": "intro",   "frame": 0},
+  {"kind": "swipe",   "frame": 45},
+  {"kind": "swipe",   "frame": 135},
+  {"kind": "riser",   "frame": 255},
+  {"kind": "closing", "frame": 299}
+]
+```
+
+Valid kinds: `intro` (punchy hit at the opening), `swipe` (light cut between lines), `riser`
+(rising build before the last line), `closing` (soft ending chime). Frames are absolute (same
+timeline as `shots[i].from`). Put a `swipe` at every line boundary including the last one — the
+last boundary gets a swipe AND a riser together, marking the ending transition. The riser should
+start 60 frames before the last line starts so it ENDS exactly at the last shot's start (the file
+is 2 s = 60 frames at 30 fps) — `shots[shots.length - 1].from - 60`. The renderer validates
+each cue and skips invalid ones with a warning. All cues are reported in `result.json` under
+`sfx_cues`.
+
+If you omit `cues.json`, the video renders with no sfx (music only).
+
 ## New clips
 
 When `idea.json` says `new_clips_allowed: true` and a line needs footage none of the media

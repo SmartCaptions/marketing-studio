@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, SFX_SRC, SFX_VOLUME} from './audioMix';
+import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, shotVoWindows, SFX_SRC, SFX_VOLUME, BASE, DUCKED, voiceDuck} from './audioMix';
 import type {SfxCue} from './sfxCues';
 
 const TIMING = {
@@ -89,12 +89,12 @@ describe('duckedVolume', () => {
     expect(duckedVolume(200, W, 1350)).toBeCloseTo(0.35, 5);
   });
   it('ducks inside a window', () => {
-    expect(duckedVolume(350, W, 1350)).toBeCloseTo(0.12, 5);
+    expect(duckedVolume(350, W, 1350)).toBeCloseTo(DUCKED, 5);
   });
   it('ramps linearly at the window edge', () => {
     const v = duckedVolume(296, W, 1350); // 4 frames into the 9-frame approach (300-9=291)
-    expect(v).toBeLessThan(0.35);
-    expect(v).toBeGreaterThan(0.12);
+    expect(v).toBeLessThan(BASE);
+    expect(v).toBeGreaterThan(DUCKED);
   });
   it('applies master fades at the ends', () => {
     expect(duckedVolume(0, [], 1350)).toBe(0);
@@ -103,5 +103,50 @@ describe('duckedVolume', () => {
   });
   it('is base volume with no windows mid-video', () => {
     expect(duckedVolume(700, [], 1350)).toBeCloseTo(0.35, 5);
+  });
+});
+
+describe('shotVoWindows', () => {
+  it('returns empty array for empty shots', () => {
+    expect(shotVoWindows([])).toEqual([]);
+  });
+
+  it('maps a single shot to frame 0 through its length', () => {
+    // 1000ms at 30fps = 30 frames
+    const windows = shotVoWindows([{audioDurationMs: 1000}]);
+    expect(windows).toEqual([{fromFrame: 0, toFrame: 30}]);
+  });
+
+  it('packs successive shots end-to-start with no gap', () => {
+    const windows = shotVoWindows([
+      {audioDurationMs: 1000}, // 0-30
+      {audioDurationMs: 2000}, // 30-90
+      {audioDurationMs: 500},  // 90-105
+    ]);
+    expect(windows).toEqual([
+      {fromFrame: 0, toFrame: 30},
+      {fromFrame: 30, toFrame: 90},
+      {fromFrame: 90, toFrame: 105},
+    ]);
+  });
+
+  it('ceils fractional frame counts', () => {
+    // 1100ms at 30fps = 33 frames exactly
+    const windows = shotVoWindows([{audioDurationMs: 1100}]);
+    expect(windows[0].toFrame).toBe(33);
+  });
+});
+
+describe('voiceDuck and levelled effect gains', () => {
+  const W = [{fromFrame: 100, toFrame: 200}];
+  it('leaves effects at full level between lines and ducks them like the music under the voice', () => {
+    expect(voiceDuck(10, W)).toBe(1);
+    expect(voiceDuck(150, W)).toBeCloseTo(DUCKED / BASE, 5);
+  });
+  it('uses a video-levelled gain over the fixed volume when one is given', () => {
+    const cues = [{kind: 'intro' as const, frame: 0}, {kind: 'swipe' as const, frame: 30}];
+    const layers = resolveSfxLayers(cues, () => true, {intro: 0.2});
+    expect(layers[0].volume).toBe(0.2);
+    expect(layers[1].volume).toBe(SFX_VOLUME.swipe);
   });
 });

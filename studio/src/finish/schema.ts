@@ -43,6 +43,11 @@ export const finishShotSchema = z.object({
   plan: planSchema,
 });
 
+const sfxCueSchema = z.object({
+  kind: z.string(),
+  frame: z.number().int().nonnegative(),
+});
+
 export const finishPropsSchema = z.object({
   brandId: z.string(),
   language: z.enum(['he', 'en']),
@@ -57,6 +62,19 @@ export const finishPropsSchema = z.object({
   uses: z.array(z.string()),
   /** True when any used media is AI footage; set by calculateMetadata */
   aiDisclosure: z.boolean(),
+  /** Generated music track; null when generation failed or the key is absent. */
+  music: z.object({src: z.string(), durationMs: z.number().positive()}).nullable().optional(),
+  /** Why music is absent (for the review card). */
+  musicAbsentReason: z.string().nullable().optional(),
+  /** Sound-effect cues the finishing session declared, or template-derived defaults. */
+  sfxCues: z.array(sfxCueSchema).optional(),
+  /** True when sfx files are staged (set by prepare step). */
+  sfxEnabled: z.boolean().optional(),
+  /** Each effect's volume, levelled to this video's voice by finish-prepare */
+  sfxGains: z.record(z.string(), z.number().min(0).max(1)).optional(),
+  /** When true, voice-over <Audio> elements are suppressed but ducking windows stay active.
+   *  Used for music-only renders to measure per-window ducked-music LUFS. */
+  muteVoice: z.boolean().optional(),
 });
 
 export type FinishProps = z.infer<typeof finishPropsSchema>;

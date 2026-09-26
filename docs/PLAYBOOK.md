@@ -198,6 +198,16 @@ placeholder so smoke stays green on a clean clone.
   credits per generation for music.
 - Remotion's `Audio` component is deprecated; use `Html5Audio` (same export, same
   props, zero behavior change) — see `SoundTrack.tsx`.
+- Directed videos (HybridPost, Finish) level the music and each effect to the video's measured
+  voice before ducking (`scripts/lib/postMusic.mjs`: `levelToVoice`, `effectGains`), because
+  generated tracks come in anywhere from -11 to -18 LUFS and a fixed duck left a quiet English
+  voice under 12 dB above a hot track. Effects under speech take the music's duck
+  (`audioMix.ts` `voiceDuck`). Rendered posts end with a limiter after loudnorm: intro hits
+  otherwise peaked at -0.6 dBTP.
+- Hebrew TTS (`scripts/lib/tts.mjs`): `eleven_v3` ignores `voice_settings.speed`, so the lighter,
+  quicker read the owner chose is stability 0 plus a `[cheerfully] ` tag, then `atempo=1.15`
+  with the character timings divided by 1.15. The with-timestamps alignment returns the tag as
+  characters; they are dropped before words are built.
 - Fallback behavior is part of the contract, not an error state: missing
   `ELEVENLABS_API_KEY` makes the feeder exit 2 with guidance and the video renders
   silent — that silent render is still a valid deliverable on a clean clone.

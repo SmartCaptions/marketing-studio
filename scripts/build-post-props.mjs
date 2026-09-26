@@ -17,6 +17,7 @@ import {dirname, basename, extname, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, alignmentToWords, MODEL_FOR_LANG} from './lib/tts.mjs';
+import {buildMusicPrompt, effectGains, generatePostMusic} from './lib/postMusic.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_PUBLIC = join(ROOT, 'studio', 'public');
@@ -108,14 +109,14 @@ const calcStepPopFrames = (items, captions, durationMs, fps) => {
 
 /**
  * @param {{narration: string, shotIndex: number, voiceId: string, modelId: string,
- *           apiKey: string, postPublicDir: string, publicRoot: string}} opts
+ *           apiKey: string, language: string, postPublicDir: string, publicRoot: string}} opts
  * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array, words: Array}>}
  */
-const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey, postPublicDir, publicRoot}) => {
+const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey, language, postPublicDir, publicRoot}) => {
   console.log(`[build-post-props] shot ${shotIndex}: TTS "${narration.slice(0, 60)}…"`);
 
   const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(
-    narration, voiceId, modelId, apiKey,
+    narration, voiceId, modelId, apiKey, language,
   );
 
   const audioAbs = join(postPublicDir, `shot-${shotIndex}.mp3`);
@@ -258,6 +259,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
       voiceId,
       modelId,
       apiKey,
+      language: job.language,
       postPublicDir,
       publicRoot,
     });
@@ -316,7 +318,23 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
     });
   }
 
-  // 6. Assemble props
+  // 6. Generate music (one call per video; cached by postPublicDir when length/look unchanged)
+  const totalDurationMs = processedShots.reduce((acc, s) => acc + s.audioDurationMs, 0);
+  const {music, musicAbsentReason} = await generatePostMusic({
+    postPublicDir,
+    publicRoot,
+    totalDurationMs,
+    language: job.language,
+    look: job.look,
+    postType: job.post_type,
+    root: ROOT,
+    voiceFiles: processedShots.map((s) => join(publicRoot, s.audioSrc)),
+  });
+  if (musicAbsentReason) {
+    console.warn(`[build-post-props] music absent: ${musicAbsentReason}`);
+  }
+
+  // 7. Assemble props
   const props = {
     brandId: 'smartcaptions',
     language: job.language,
@@ -325,14 +343,19 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
     wordmarkSrc,
     attribution: job.attribution ?? null,
     shots: processedShots,
+    music,
+    musicAbsentReason: musicAbsentReason ?? null,
+    sfx: existsSync(join(publicRoot, 'sfx', 'intro.mp3'))
+      ? {enabled: true, gains: effectGains({sfxDir: join(publicRoot, 'sfx'), voiceFiles: processedShots.map((s) => join(publicRoot, s.audioSrc))})}
+      : {enabled: false},
   };
 
-  // 7. Write
+  // 8. Write
   const propsPath = join(outputDir, 'post-props.json');
   writeFileSync(propsPath, JSON.stringify(props, null, 2));
   console.log(`[build-post-props] wrote props to ${propsPath}`);
 
-  return {propsPath, props, voiceId};
+  return {propsPath, props, voiceId, music, musicAbsentReason};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

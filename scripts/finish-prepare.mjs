@@ -17,9 +17,13 @@
  */
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
-import {join, resolve} from 'node:path';
+import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPostProps, stageMedia} from './build-post-props.mjs';
+import {effectGains, generatePostMusic} from './lib/postMusic.mjs';
+import {stageSfxLibrary} from './lib/finish-sound.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Pixel size and length of staged media; a still has no length */
 const probe = (file) => {
@@ -115,6 +119,26 @@ export const prepareFinish = async ({jobPath, workDir}) => {
 
   Object.assign(media, stageExtra(job.extra_media ?? [], publicRoot, 'extra'));
 
+  // The effects library is built once by scripts/build-sfx.mjs; without it the video has none.
+  const workSfxDir = join(publicRoot, 'sfx');
+  const sfxEnabled = stageSfxLibrary(join(ROOT, 'studio', 'public', 'sfx'), workSfxDir);
+
+  // Generate music before the session starts (session must not make network calls; INV-G4).
+  const totalDurationMs = shots.reduce((acc, s) => acc + s.audioDurationMs, 0);
+  const {music, musicAbsentReason} = await generatePostMusic({
+    postPublicDir: publicRoot,
+    publicRoot,
+    totalDurationMs,
+    language: post.language,
+    look: post.look,
+    postType: job.post_type,
+    root: ROOT,
+    voiceFiles: shots.map((s) => join(publicRoot, s.audioSrc)),
+  });
+  if (musicAbsentReason) {
+    console.warn(`[finish-prepare] music absent: ${musicAbsentReason}`);
+  }
+
   const props = {
     brandId: post.brandId,
     language: post.language,
@@ -126,6 +150,11 @@ export const prepareFinish = async ({jobPath, workDir}) => {
     words: {},
     uses: [],
     aiDisclosure: false,
+    music,
+    musicAbsentReason: musicAbsentReason ?? null,
+    sfxEnabled,
+    ...(sfxEnabled ? {sfxGains: effectGains({sfxDir: workSfxDir, voiceFiles: shots.map((s) => join(publicRoot, s.audioSrc))})} : {}),
+    sfxCues: [],
   };
   const propsPath = join(workDir, 'props.json');
   writeFileSync(propsPath, JSON.stringify(props, null, 2));

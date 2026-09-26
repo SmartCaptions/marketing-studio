@@ -12,13 +12,20 @@ import type {Motion} from './motion';
 //   riser  — a rising build that leads into the end-card CTA
 //   tick   — a soft UI blip on each feature benefit-line reveal
 
-export type SfxKind = 'whoosh' | 'tick' | 'riser';
+export type SfxKind = 'whoosh' | 'tick' | 'riser' | 'intro' | 'swipe' | 'closing';
 export type SfxCue = {kind: SfxKind; frame: number};
 
 type Timing = {logo: Act; hook: Act; demo: Act; features: Act[]; end: Act};
 
 // Frames before the end act where the riser begins (leads into the CTA).
+// Launch-video riser: positioned so it builds up to the end card — 45 frames gives
+// a punchy 1.5 s lead-in that works with the end-card animation overlap.
 export const RISER_LEAD = 45;
+
+// Frames before the last shot where the post riser begins, derived from the riser
+// file's duration: 2.0 s × 30 fps = 60 frames.  This ensures the riser ENDS exactly
+// at the last shot's start (AC-2.2 ±5 frames).
+export const POST_RISER_LEAD = 60;
 
 // Must track FeaturePanel.tsx: benefit line `i` reveals at
 // `delayFrames = FEATURE_LINE_DELAY + staggerDelay(i, FEATURE_LINE_STAGGER, motion)`
@@ -54,6 +61,56 @@ export const sfxCues = (
 
   // riser building into the end-card CTA.
   cues.push({kind: 'riser', frame: timing.end.from - RISER_LEAD});
+
+  return cues.sort((a, b) => a.frame - b.frame);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Post sfx cues — for HybridPost and Finish (shot-based, not act-based)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Derive SFX cues for a directed video (HybridPost or Finish) from the absolute
+ * start frame of each shot.
+ *
+ *   intro   — at frame 0 (beginning of the video)
+ *   swipe   — at each shot boundary except the last (between lines)
+ *   riser   — RISER_LEAD frames before the last shot starts (builds into the ending)
+ *   closing — optional: if `includeClosing`, one frame after the last shot ends
+ *
+ * @param shotStartFrames - absolute start frame of each shot (from timeline)
+ * @param totalFrames     - total video length in frames (for closing hit placement)
+ * @param includeClosing  - whether to include an optional closing hit
+ */
+export const postSfxCues = (
+  shotStartFrames: number[],
+  totalFrames: number,
+  includeClosing = false,
+): SfxCue[] => {
+  if (shotStartFrames.length === 0) return [];
+  const cues: SfxCue[] = [];
+
+  // Intro hit at the very start of the video.
+  cues.push({kind: 'intro', frame: 0});
+
+  // Swipe at every shot boundary including the last one.  The last boundary also gets
+  // a riser (which ends at its start); swipe + riser together mark the ending transition.
+  for (let i = 1; i < shotStartFrames.length; i++) {
+    cues.push({kind: 'swipe', frame: shotStartFrames[i]});
+  }
+
+  // Riser leading into the last shot: start POST_RISER_LEAD frames before so the riser
+  // ENDS exactly at the last shot's start (AC-2.2: ±5 frames; file is 2 s = 60 frames).
+  if (shotStartFrames.length > 1) {
+    const lastFrom = shotStartFrames[shotStartFrames.length - 1];
+    const riserFrame = Math.max(0, lastFrom - POST_RISER_LEAD);
+    cues.push({kind: 'riser', frame: riserFrame});
+  }
+
+  // Optional closing hit near the end.
+  if (includeClosing && totalFrames > 0) {
+    cues.push({kind: 'closing', frame: Math.max(0, totalFrames - 15)});
+  }
 
   return cues.sort((a, b) => a.frame - b.frame);
 };

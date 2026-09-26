@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {launchTiming} from './launchTiming';
 import {DEFAULT_MOTION} from './motion';
-import {RISER_LEAD, sfxCues} from './sfxCues';
+import {RISER_LEAD, POST_RISER_LEAD, sfxCues, postSfxCues} from './sfxCues';
 
 // Real noban inputs: telemetry 16085ms, 2 features of 3 benefit lines each.
 const T = launchTiming(16085, 2); // demo len = ceil(16085/1000*30)+24 = 507
@@ -56,5 +56,66 @@ describe('sfxCues', () => {
     const wide = sfxCues(T, [2, 0], {...DEFAULT_MOTION, stagger: 1}).filter((c) => c.kind === 'tick');
     // stagger 1 => staggerDelay(i,10) = i*10*(1/0.5) = i*20
     expect(wide.map((c) => c.frame)).toEqual([858, 878]); // 843+15, 843+15+20
+  });
+});
+
+describe('postSfxCues', () => {
+  it('returns empty array for empty shot list', () => {
+    expect(postSfxCues([], 300)).toEqual([]);
+  });
+
+  it('single shot: only intro cue, no swipes or riser', () => {
+    const cues = postSfxCues([0], 90);
+    expect(cues).toHaveLength(1);
+    expect(cues[0]).toEqual({kind: 'intro', frame: 0});
+  });
+
+  it('two shots: intro + swipe at last boundary + riser', () => {
+    // Every shot boundary (including the last) gets a swipe.
+    // Riser ends at last shot start (ENDS there, so starts POST_RISER_LEAD=60 before).
+    const cues = postSfxCues([0, 90], 180);
+    expect(cues.map((c) => c.kind).sort()).toEqual(['intro', 'riser', 'swipe']);
+    expect(cues.find((c) => c.kind === 'swipe')?.frame).toBe(90);
+    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(90 - POST_RISER_LEAD);
+  });
+
+  it('three shots: intro + swipe at each boundary including last + riser', () => {
+    const cues = postSfxCues([0, 60, 120], 180);
+    expect(cues.filter((c) => c.kind === 'swipe')).toHaveLength(2);
+    expect(cues.filter((c) => c.kind === 'swipe').map((c) => c.frame)).toEqual([60, 120]);
+    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(120 - POST_RISER_LEAD);
+  });
+
+  it('does not add closing by default', () => {
+    const cues = postSfxCues([0, 60, 120], 180);
+    expect(cues.some((c) => c.kind === 'closing')).toBe(false);
+  });
+
+  it('adds closing at totalFrames - 15 when includeClosing is true', () => {
+    const cues = postSfxCues([0, 60, 120], 180, true);
+    const closing = cues.find((c) => c.kind === 'closing');
+    expect(closing?.frame).toBe(165); // 180 - 15
+  });
+
+  it('clamps riser to frame 0 when last shot is very early', () => {
+    // Last shot at frame 10, riser would be 10 - 45 = negative → 0
+    const cues = postSfxCues([0, 10], 90);
+    expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(0);
+  });
+});
+
+describe('templateCues (scripts/lib/post-cues.mjs) mirrors postSfxCues', () => {
+  it('reports the same cues HybridPost renders for the same shots', async () => {
+    // @ts-expect-error plain ESM script without types
+    const mirror = await import('../../../scripts/lib/post-cues.mjs');
+    expect(mirror.POST_RISER_LEAD).toBe(POST_RISER_LEAD);
+    const shots = [{audioDurationMs: 4072}, {audioDurationMs: 3608}, {audioDurationMs: 4351}, {audioDurationMs: 5373}];
+    const starts: number[] = [];
+    let cursor = 0;
+    for (const s of shots) {
+      starts.push(cursor);
+      cursor += Math.ceil((s.audioDurationMs / 1000) * 30);
+    }
+    expect(mirror.templateCues(shots)).toEqual(postSfxCues(starts, cursor));
   });
 });

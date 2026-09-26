@@ -22,6 +22,7 @@ import {dirname, isAbsolute, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {findLiteralText} from './lib/finish-lint.mjs';
 import {buildSrt, measureMs, normaliseLoudness} from './lib/post-output.mjs';
+import {audibleCues} from './lib/finish-sound.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_DIR = join(ROOT, 'studio');
@@ -37,6 +38,37 @@ const readJson = (file, what) => {
   }
 };
 
+const VALID_SFX_KINDS = new Set(['whoosh', 'tick', 'riser', 'intro', 'swipe', 'closing']);
+
+/**
+ * Read and validate cues.json from the work directory when present.
+ * Returns the validated cue array (possibly empty). Invalid cues are skipped with a warning.
+ */
+const loadCues = (work) => {
+  const cuePath = join(work, 'cues.json');
+  if (!existsSync(cuePath)) return [];
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(cuePath, 'utf8'));
+  } catch {
+    console.warn('[finish-render] cues.json is not valid JSON — ignoring');
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    console.warn('[finish-render] cues.json must be an array — ignoring');
+    return [];
+  }
+  const valid = [];
+  for (const c of raw) {
+    if (typeof c.kind !== 'string' || !VALID_SFX_KINDS.has(c.kind) || typeof c.frame !== 'number' || c.frame < 0) {
+      console.warn(`[finish-render] cues.json: skipping invalid cue ${JSON.stringify(c)}`);
+      continue;
+    }
+    valid.push({kind: c.kind, frame: Math.round(c.frame)});
+  }
+  return valid;
+};
+
 /** Loads the work directory and refuses one the Finish composition cannot render truthfully */
 const loadWork = (work) => {
   const props = readJson(join(work, 'props.json'), 'props.json');
@@ -48,6 +80,13 @@ const loadWork = (work) => {
   const literals = findLiteralText(join(work, 'src'), STUDIO_DIR);
   if (literals.length) {
     throw new FinishError(`Shown text must come from words.json through <T k="…"/> or useWord():\n${literals.join('\n')}`);
+  }
+  // Merge session-declared cues: these override the empty default from prepare.
+  const cues = loadCues(work);
+  if (cues.length) {
+    console.log(`[finish-render] loaded ${cues.length} sfx cue(s) from cues.json`);
+    props.sfxCues = cues;
+    props.sfxEnabled = props.sfxEnabled && cues.length > 0;
   }
   return {...props, words};
 };
@@ -153,6 +192,9 @@ const renderFinal = async (work) => {
     if (renderedMs === null || Math.abs(renderedMs - expectedMs) > 1000) {
       throw new FinishError(`the rendered video lasts ${renderedMs ?? 'an unknown time'} ms, not the voice-over's ${expectedMs} ms`);
     }
+    const musicPresent = Boolean(inputProps.music);
+    const musicAbsentReason = inputProps.musicAbsentReason ?? null;
+    const {sfxCues, sfxAbsentReason} = audibleCues(join(work, 'public', 'sfx'), inputProps);
     writeResult({
       status: 'done',
       video,
@@ -161,8 +203,16 @@ const renderFinal = async (work) => {
       ai_media: composition.props.aiDisclosure,
       uses: composition.props.uses,
       words: inputProps.words,
+      music: musicPresent ? {src: inputProps.music.src} : null,
+      music_absent_reason: musicPresent ? null : musicAbsentReason,
+      sfx_cues: sfxCues.map((c) => ({kind: c.kind, frame: c.frame})),
+      sfx_absent_reason: sfxAbsentReason,
     });
-    console.log(`done: ${video} (${renderedMs} ms; AI label ${composition.props.aiDisclosure ? 'on' : 'off'})`);
+    console.log(
+      `done: ${video} (${renderedMs} ms; AI label ${composition.props.aiDisclosure ? 'on' : 'off'}; ` +
+      `music ${musicPresent ? 'present' : `absent: ${musicAbsentReason}`}; ` +
+      `sfx cues: ${sfxCues.length})`,
+    );
   } catch (err) {
     writeResult({status: 'failed', error: `The final render failed: ${err.message.slice(0, 600)}`});
     throw err;

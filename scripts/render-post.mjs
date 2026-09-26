@@ -22,6 +22,7 @@ import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPostProps} from './build-post-props.mjs';
 import {buildSrt, measureMs, normaliseLoudness} from './lib/post-output.mjs';
+import {templateCues} from './lib/post-cues.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_DIR = join(ROOT, 'studio');
@@ -67,10 +68,10 @@ const main = async () => {
   };
 
   // ─── Step 1: Build props ──────────────────────────────────────────────────
-  let propsPath, props, voiceId;
+  let propsPath, props, voiceId, music, musicAbsentReason;
   try {
     console.log('[render-post] building props…');
-    ({propsPath, props, voiceId} = await buildPostProps({jobPath: jobAbs}));
+    ({propsPath, props, voiceId, music, musicAbsentReason} = await buildPostProps({jobPath: jobAbs}));
   } catch (err) {
     const msg = err.message ?? String(err);
     console.error(`[render-post] props build failed: ${msg}`);
@@ -138,6 +139,10 @@ const main = async () => {
     duration_ms: renderedMs ?? voTotalMs,
     captions: postSrt,
     voice_id: voiceId,
+    music: music ? {src: music.src} : null,
+    music_absent_reason: music ? null : (musicAbsentReason ?? null),
+    sfx_cues: props.sfx?.enabled ? templateCues(props.shots) : [],
+    sfx_absent_reason: props.sfx?.enabled ? null : 'the effects library is not staged (run scripts/build-sfx.mjs)',
   });
   console.log(`[render-post] done → ${resultPath}`);
 };

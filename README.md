@@ -240,6 +240,15 @@ directory outside this repo. This repo supplies the pieces:
   renders a still of each piece of footage, and `--final` renders the finished MP4 with its SRT
   and `result.json`. It refuses visuals that write text into the JSX instead of `words.json`.
 
+**Sound.** Both `Finish` and the `HybridPost` template play a music bed and sound effects under
+the voice. The props builders (`build-post-props.mjs`, `finish-prepare.mjs`) make one ElevenLabs
+track per video (`scripts/lib/postMusic.mjs`, reused while the length and look hold), level it and
+each effect to that video's voice, and pass both in the props; `audioMix.ts` drops them under
+each line. The effects library is made once with `node scripts/build-sfx.mjs`. The template puts
+the effects at fixed points (`sfxCues.ts` `postSfxCues`); a finishing session places its own in
+`cues.json` (`KIT.md`, "Sound"). `result.json` reports `music`, `sfx_cues` and a reason for
+whichever is missing; either can be missing without stopping the render.
+
 `Finish` is registered only by its own entry (`studio/src/finish/index.tsx`), so a work
 directory's code never enters the studio's own bundle.
 
