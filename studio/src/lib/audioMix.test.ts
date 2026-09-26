@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, shotVoWindows, SFX_SRC, SFX_VOLUME, BASE, DUCKED} from './audioMix';
+import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, shotVoWindows, SFX_SRC, SFX_VOLUME, BASE, DUCKED, voiceDuck} from './audioMix';
 import type {SfxCue} from './sfxCues';
 
 const TIMING = {
@@ -134,5 +134,19 @@ describe('shotVoWindows', () => {
     // 1100ms at 30fps = 33 frames exactly
     const windows = shotVoWindows([{audioDurationMs: 1100}]);
     expect(windows[0].toFrame).toBe(33);
+  });
+});
+
+describe('voiceDuck and levelled effect gains', () => {
+  const W = [{fromFrame: 100, toFrame: 200}];
+  it('leaves effects at full level between lines and ducks them like the music under the voice', () => {
+    expect(voiceDuck(10, W)).toBe(1);
+    expect(voiceDuck(150, W)).toBeCloseTo(DUCKED / BASE, 5);
+  });
+  it('uses a video-levelled gain over the fixed volume when one is given', () => {
+    const cues = [{kind: 'intro' as const, frame: 0}, {kind: 'swipe' as const, frame: 30}];
+    const layers = resolveSfxLayers(cues, () => true, {intro: 0.2});
+    expect(layers[0].volume).toBe(0.2);
+    expect(layers[1].volume).toBe(SFX_VOLUME.swipe);
   });
 });

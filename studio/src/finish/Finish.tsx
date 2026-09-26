@@ -6,7 +6,7 @@ import React from 'react';
 import {AbsoluteFill, Html5Audio, Sequence, staticFile, useVideoConfig, type CalculateMetadataFunction} from 'remotion';
 import {Visuals, USES} from '@work/Visuals';
 import {getBrand} from '../lib/brand';
-import {duckedVolume, resolveSfxLayers, shotVoWindows} from '../lib/audioMix';
+import {duckedVolume, resolveSfxLayers, shotVoWindows, voiceDuck} from '../lib/audioMix';
 import {AiLabel, COLLAGE_PAPER, ShotCaptions} from '../templates/HybridPost';
 import {FinishProvider, buildTimeline} from './kit';
 import {FPS, type FinishProps} from './schema';
@@ -39,6 +39,7 @@ export const Finish: React.FC<FinishProps> = (props) => {
     ? resolveSfxLayers(
         (props.sfxCues ?? []) as import('../lib/sfxCues').SfxCue[],
         () => true,
+        props.sfxGains,
       )
     : [];
 
@@ -55,7 +56,7 @@ export const Finish: React.FC<FinishProps> = (props) => {
       {/* SFX cue layer */}
       {sfxLayers.map((layer, i) => (
         <Sequence key={`sfx-${i}`} from={layer.frame}>
-          <Html5Audio src={staticFile(layer.src)} volume={() => layer.volume} />
+          <Html5Audio src={staticFile(layer.src)} volume={(f) => layer.volume * voiceDuck(layer.frame + f, voWindows)} />
         </Sequence>
       ))}
 

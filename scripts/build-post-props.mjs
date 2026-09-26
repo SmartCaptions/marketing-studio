@@ -17,7 +17,7 @@ import {dirname, basename, extname, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, alignmentToWords, MODEL_FOR_LANG} from './lib/tts.mjs';
-import {buildMusicPrompt, generatePostMusic} from './lib/postMusic.mjs';
+import {buildMusicPrompt, effectGains, generatePostMusic} from './lib/postMusic.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_PUBLIC = join(ROOT, 'studio', 'public');
@@ -345,7 +345,9 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
     shots: processedShots,
     music,
     musicAbsentReason: musicAbsentReason ?? null,
-    sfx: {enabled: existsSync(join(publicRoot, 'sfx', 'intro.mp3'))},
+    sfx: existsSync(join(publicRoot, 'sfx', 'intro.mp3'))
+      ? {enabled: true, gains: effectGains({sfxDir: join(publicRoot, 'sfx'), voiceFiles: processedShots.map((s) => join(publicRoot, s.audioSrc))})}
+      : {enabled: false},
   };
 
   // 8. Write

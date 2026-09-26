@@ -176,3 +176,27 @@ export const generatePostMusic = async ({
     musicAbsentReason: null,
   };
 };
+
+// How far under the voice each effect sits between lines; audioMix.ts voiceDuck takes a
+// further ~9 dB off wherever an effect lands under speech.
+const EFFECT_OFFSET_DB = {intro: -4, swipe: -6, riser: -4, closing: -8};
+
+/**
+ * Each staged effect's volume for this video, levelled to its voice. An effect whose file or
+ * loudness can't be read is left out, so the composition's fixed volume applies to it.
+ *
+ * @param {{sfxDir: string, voiceFiles: string[]}} opts
+ * @returns {Record<string, number>}
+ */
+export const effectGains = ({sfxDir, voiceFiles}) => {
+  const voice = measureLufs(voiceFiles);
+  if (voice === null) return {};
+  const gains = {};
+  for (const [kind, offset] of Object.entries(EFFECT_OFFSET_DB)) {
+    const file = join(sfxDir, `${kind}.mp3`);
+    const effect = existsSync(file) ? measureLufs([file]) : null;
+    if (effect === null) continue;
+    gains[kind] = Math.min(1, Math.round(10 ** ((voice + offset - effect) / 20) * 1000) / 1000);
+  }
+  return gains;
+};

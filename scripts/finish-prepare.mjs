@@ -20,7 +20,7 @@ import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFil
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPostProps, stageMedia} from './build-post-props.mjs';
-import {generatePostMusic} from './lib/postMusic.mjs';
+import {effectGains, generatePostMusic} from './lib/postMusic.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -163,6 +163,7 @@ export const prepareFinish = async ({jobPath, workDir}) => {
     music,
     musicAbsentReason: musicAbsentReason ?? null,
     sfxEnabled,
+    ...(sfxEnabled ? {sfxGains: effectGains({sfxDir: workSfxDir, voiceFiles: shots.map((s) => join(publicRoot, s.audioSrc))})} : {}),
     sfxCues: [],
   };
   const propsPath = join(workDir, 'props.json');

@@ -51,7 +51,7 @@ import {
 } from 'remotion';
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
-import {duckedVolume, resolveSfxLayers, shotVoWindows} from '../lib/audioMix';
+import {duckedVolume, resolveSfxLayers, shotVoWindows, voiceDuck} from '../lib/audioMix';
 import {loadHybridPostFonts} from '../lib/fonts';
 import {isHebrew} from '../lib/locale';
 import {brandSpring} from '../lib/motion';
@@ -122,7 +122,11 @@ export const hybridPostSchema = z.object({
   /** Why music is absent, for the review card. */
   musicAbsentReason: z.string().nullable().optional(),
   /** Sound-effect cue layer. `enabled` is set by the builder only when sfx files are staged. */
-  sfx: z.object({enabled: z.boolean()}).optional(),
+  sfx: z.object({
+    enabled: z.boolean(),
+    /** Each effect's volume, levelled to this video's voice by the props builder */
+    gains: z.record(z.string(), z.number().min(0).max(1)).optional(),
+  }).optional(),
   /**
    * When true, voice-over <Audio> elements are silenced but the ducking windows remain
    * active.  Used to produce a music-and-effects-only render for level measurement
@@ -1686,7 +1690,7 @@ export const HybridPost: React.FC<HybridPostProps> = ({
   const sfxEnabled = sfx?.enabled === true;
   const sfxCues = sfxEnabled ? postSfxCues(shotStartFrames, durationInFrames) : [];
   const sfxLayers = sfxEnabled
-    ? resolveSfxLayers(sfxCues, () => true)
+    ? resolveSfxLayers(sfxCues, () => true, sfx?.gains)
     : [];
 
   // Show AI disclosure when flag is set or any shot is a clip
@@ -1716,7 +1720,7 @@ export const HybridPost: React.FC<HybridPostProps> = ({
       {/* SFX cue layer (intro, swipes, riser) */}
       {sfxLayers.map((layer, i) => (
         <Sequence key={`sfx-${i}`} from={layer.frame}>
-          <Html5Audio src={staticFile(layer.src)} volume={() => layer.volume} />
+          <Html5Audio src={staticFile(layer.src)} volume={(f) => layer.volume * voiceDuck(layer.frame + f, voWindows)} />
         </Sequence>
       ))}
 

@@ -57,12 +57,8 @@ export const voWindows = (
     return {fromFrame, toFrame, src: line.src};
   });
 
-export const duckedVolume = (
-  frame: number,
-  windows: {fromFrame: number; toFrame: number}[],
-  totalFrames: number,
-): number => {
-  // duck factor: 1 fully inside a window, 0 outside, linear over RAMP frames
+// How far into a voice window a frame is: 1 fully inside, 0 outside, linear over RAMP frames
+const duckAmount = (frame: number, windows: {fromFrame: number; toFrame: number}[]): number => {
   let duck = 0;
   for (const w of windows) {
     if (frame < w.fromFrame - RAMP || frame > w.toFrame + RAMP) continue;
@@ -71,11 +67,23 @@ export const duckedVolume = (
     else if (frame > w.toFrame) d = ((w.toFrame + RAMP) - frame) / RAMP;
     duck = Math.max(duck, Math.min(1, Math.max(0, d)));
   }
-  const level = BASE - (BASE - DUCKED) * duck;
+  return duck;
+};
+
+export const duckedVolume = (
+  frame: number,
+  windows: {fromFrame: number; toFrame: number}[],
+  totalFrames: number,
+): number => {
+  const level = BASE - (BASE - DUCKED) * duckAmount(frame, windows);
   const fadeIn = Math.min(1, frame / FADE_IN);
   const fadeOut = Math.min(1, (totalFrames - 1 - frame) / FADE_OUT);
   return level * Math.max(0, fadeIn) * Math.max(0, fadeOut);
 };
+
+/** The music's duck as a factor for effects: 1 between lines, DUCKED/BASE under the voice */
+export const voiceDuck = (frame: number, windows: {fromFrame: number; toFrame: number}[]): number =>
+  1 - (1 - DUCKED / BASE) * duckAmount(frame, windows);
 
 // --- Sound-design cue layer ------------------------------------------------
 // Static file per cue kind, staged under studio/public/ by scripts/build-sfx.mjs.
@@ -109,12 +117,15 @@ export type SfxLayer = {src: string; frame: number; volume: number};
 // whose file the caller reports missing (nullable-asset / silent-skip rule). At render
 // time presence is guaranteed by the manifest's `sfx.enabled` gate; the fileExists
 // hook keeps the resolution unit-testable and future-proofs a real per-file check.
+// A directed video passes `gains`: each effect levelled to that video's voice when it was
+// prepared (scripts/lib/postMusic.mjs effectGains). Without them the fixed volumes apply.
 export const resolveSfxLayers = (
   cues: SfxCue[],
   fileExists: (src: string) => boolean,
+  gains?: Partial<Record<SfxKind, number>>,
 ): SfxLayer[] =>
   cues
-    .map((c) => ({src: SFX_SRC[c.kind], frame: c.frame, volume: SFX_VOLUME[c.kind]}))
+    .map((c) => ({src: SFX_SRC[c.kind], frame: c.frame, volume: gains?.[c.kind] ?? SFX_VOLUME[c.kind]}))
     .filter((layer) => fileExists(layer.src));
 
 // ─────────────────────────────────────────────────────────────────────────────

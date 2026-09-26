@@ -5,7 +5,7 @@ import {existsSync, mkdtempSync, writeFileSync, rmSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {buildMusicPrompt, generatePostMusic, levelToVoice, measureLufs} from './postMusic.mjs';
+import {buildMusicPrompt, effectGains, generatePostMusic, levelToVoice, measureLufs} from './postMusic.mjs';
 
 // ─── buildMusicPrompt ────────────────────────────────────────────────────────
 
@@ -163,6 +163,27 @@ describe('levelToVoice', () => {
       writeFileSync(raw, 'not audio');
       assert.equal(levelToVoice({rawPath: raw, outPath: join(dir, 'music.mp3'), voiceFiles: [raw]}), null);
       assert.ok(existsSync(join(dir, 'music.mp3')));
+    } finally {
+      rmSync(dir, {recursive: true, force: true});
+    }
+  });
+});
+
+// ─── effectGains ─────────────────────────────────────────────────────────────
+
+describe('effectGains', () => {
+  test('sets each staged effect under the voice by its offset, and skips missing ones', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'postMusic-fx-'));
+    try {
+      const make = (path, db) => spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i',
+        'sine=frequency=660:duration=2', '-af', `volume=${db}dB`, path]);
+      const voice = join(dir, 'voice.mp3');
+      make(voice, -20);
+      make(join(dir, 'intro.mp3'), -6);
+      const gains = effectGains({sfxDir: dir, voiceFiles: [voice]});
+      assert.deepEqual(Object.keys(gains), ['intro']);
+      // intro sits 4 dB under the voice: gain ≈ 10^((-20 - 4 - -6)/20) ≈ 0.126
+      assert.ok(Math.abs(gains.intro - 0.126) < 0.02, `got ${gains.intro}`);
     } finally {
       rmSync(dir, {recursive: true, force: true});
     }
