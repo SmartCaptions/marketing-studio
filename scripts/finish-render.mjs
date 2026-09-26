@@ -22,6 +22,7 @@ import {dirname, isAbsolute, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {findLiteralText} from './lib/finish-lint.mjs';
 import {buildSrt, measureMs, normaliseLoudness} from './lib/post-output.mjs';
+import {audibleCues} from './lib/finish-sound.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_DIR = join(ROOT, 'studio');
@@ -193,15 +194,7 @@ const renderFinal = async (work) => {
     }
     const musicPresent = Boolean(inputProps.music);
     const musicAbsentReason = inputProps.musicAbsentReason ?? null;
-    // Count only cues whose sfx file was actually staged into the work dir's public/sfx.
-    // A cue without a matching file is skipped silently by Remotion, so the count must
-    // reflect what the video actually plays, not what cues.json declared.
-    const sfxPublicDir = join(work, 'public', 'sfx');
-    const rawCues = inputProps.sfxCues ?? [];
-    const sfxCues = rawCues.filter((c) => existsSync(join(sfxPublicDir, `${c.kind}.mp3`)));
-    const sfxAbsentReason = sfxCues.length === 0
-      ? (rawCues.length > 0 || inputProps.sfxEnabled === false ? 'sfx library not staged' : 'no cues declared')
-      : null;
+    const {sfxCues, sfxAbsentReason} = audibleCues(join(work, 'public', 'sfx'), inputProps);
     writeResult({
       status: 'done',
       video,

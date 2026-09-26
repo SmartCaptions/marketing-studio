@@ -16,11 +16,12 @@
  * Prints one JSON line: {"status": "ready"|"failed", "props": path|null, "error": string|null}
  */
 import {spawnSync} from 'node:child_process';
-import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPostProps, stageMedia} from './build-post-props.mjs';
 import {effectGains, generatePostMusic} from './lib/postMusic.mjs';
+import {stageSfxLibrary} from './lib/finish-sound.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -118,17 +119,9 @@ export const prepareFinish = async ({jobPath, workDir}) => {
 
   Object.assign(media, stageExtra(job.extra_media ?? [], publicRoot, 'extra'));
 
-  // Stage the sfx library from studio/public/sfx into the work dir's public/sfx so
-  // finish-render.mjs can serve it via staticFile().  The studio library is built once
-  // by scripts/build-sfx.mjs; when it is absent the video renders without effects.
-  const studioSfxDir = join(ROOT, 'studio', 'public', 'sfx');
+  // The effects library is built once by scripts/build-sfx.mjs; without it the video has none.
   const workSfxDir = join(publicRoot, 'sfx');
-  if (existsSync(join(studioSfxDir, 'intro.mp3'))) {
-    mkdirSync(workSfxDir, {recursive: true});
-    for (const f of readdirSync(studioSfxDir).filter((f) => f.endsWith('.mp3'))) {
-      copyFileSync(join(studioSfxDir, f), join(workSfxDir, f));
-    }
-  }
+  const sfxEnabled = stageSfxLibrary(join(ROOT, 'studio', 'public', 'sfx'), workSfxDir);
 
   // Generate music before the session starts (session must not make network calls; INV-G4).
   const totalDurationMs = shots.reduce((acc, s) => acc + s.audioDurationMs, 0);
@@ -145,9 +138,6 @@ export const prepareFinish = async ({jobPath, workDir}) => {
   if (musicAbsentReason) {
     console.warn(`[finish-prepare] music absent: ${musicAbsentReason}`);
   }
-
-  // sfxEnabled: true when the library was successfully staged into this work dir.
-  const sfxEnabled = existsSync(join(workSfxDir, 'intro.mp3'));
 
   const props = {
     brandId: post.brandId,
