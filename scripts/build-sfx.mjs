@@ -7,7 +7,7 @@
 // exits 2 (no ELEVENLABS_API_KEY) nothing is generated and this script exits 0 — the
 // launch video simply renders without the cue layer (build-<brand>-audio.mjs then
 // leaves the manifest's sfx gate off). NEVER a hard failure on a missing key.
-import {copyFileSync, existsSync, mkdirSync} from 'node:fs';
+import {copyFileSync, existsSync, mkdirSync, readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
@@ -15,6 +15,16 @@ import {dirname, join} from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const assetsDir = join(root, 'assets', 'sfx');
 const publicDir = join(root, 'studio', 'public', 'sfx');
+
+// Load ELEVENLABS_API_KEY from the studio root .env into THIS process's env only.
+// The key never propagates to the calling session; it reaches only the feeder child.
+const envFile = join(root, '.env');
+if (existsSync(envFile)) {
+  for (const line of readFileSync(envFile, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([^"'\n]*)"?\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+}
 
 // Prompts tuned for short, clean, non-musical UI/transition sounds. durationSec must
 // sit in the feeder's 0.5-30s window; the spec caps each cue at <=2s.

@@ -192,10 +192,15 @@ const renderFinal = async (work) => {
       throw new FinishError(`the rendered video lasts ${renderedMs ?? 'an unknown time'} ms, not the voice-over's ${expectedMs} ms`);
     }
     const musicPresent = Boolean(inputProps.music);
-    const sfxCues = inputProps.sfxCues ?? [];
     const musicAbsentReason = inputProps.musicAbsentReason ?? null;
+    // Count only cues whose sfx file was actually staged into the work dir's public/sfx.
+    // A cue without a matching file is skipped silently by Remotion, so the count must
+    // reflect what the video actually plays, not what cues.json declared.
+    const sfxPublicDir = join(work, 'public', 'sfx');
+    const rawCues = inputProps.sfxCues ?? [];
+    const sfxCues = rawCues.filter((c) => existsSync(join(sfxPublicDir, `${c.kind}.mp3`)));
     const sfxAbsentReason = sfxCues.length === 0
-      ? (inputProps.sfxEnabled === false ? 'sfx library not staged' : 'no cues declared')
+      ? (rawCues.length > 0 || inputProps.sfxEnabled === false ? 'sfx library not staged' : 'no cues declared')
       : null;
     writeResult({
       status: 'done',

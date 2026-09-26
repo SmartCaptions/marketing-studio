@@ -16,7 +16,7 @@
  * Prints one JSON line: {"status": "ready"|"failed", "props": path|null, "error": string|null}
  */
 import {spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPostProps, stageMedia} from './build-post-props.mjs';
@@ -118,6 +118,18 @@ export const prepareFinish = async ({jobPath, workDir}) => {
 
   Object.assign(media, stageExtra(job.extra_media ?? [], publicRoot, 'extra'));
 
+  // Stage the sfx library from studio/public/sfx into the work dir's public/sfx so
+  // finish-render.mjs can serve it via staticFile().  The studio library is built once
+  // by scripts/build-sfx.mjs; when it is absent the video renders without effects.
+  const studioSfxDir = join(ROOT, 'studio', 'public', 'sfx');
+  const workSfxDir = join(publicRoot, 'sfx');
+  if (existsSync(join(studioSfxDir, 'intro.mp3'))) {
+    mkdirSync(workSfxDir, {recursive: true});
+    for (const f of readdirSync(studioSfxDir).filter((f) => f.endsWith('.mp3'))) {
+      copyFileSync(join(studioSfxDir, f), join(workSfxDir, f));
+    }
+  }
+
   // Generate music before the session starts (session must not make network calls; INV-G4).
   const totalDurationMs = shots.reduce((acc, s) => acc + s.audioDurationMs, 0);
   const {music, musicAbsentReason} = await generatePostMusic({
@@ -133,7 +145,8 @@ export const prepareFinish = async ({jobPath, workDir}) => {
     console.warn(`[finish-prepare] music absent: ${musicAbsentReason}`);
   }
 
-  const sfxEnabled = existsSync(join(publicRoot, '..', '..', 'sfx', 'intro.mp3'));
+  // sfxEnabled: true when the library was successfully staged into this work dir.
+  const sfxEnabled = existsSync(join(workSfxDir, 'intro.mp3'));
 
   const props = {
     brandId: post.brandId,
