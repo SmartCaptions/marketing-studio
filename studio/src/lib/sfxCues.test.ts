@@ -103,3 +103,19 @@ describe('postSfxCues', () => {
     expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(0);
   });
 });
+
+describe('templateCues (scripts/lib/post-cues.mjs) mirrors postSfxCues', () => {
+  it('reports the same cues HybridPost renders for the same shots', async () => {
+    // @ts-expect-error plain ESM script without types
+    const mirror = await import('../../../scripts/lib/post-cues.mjs');
+    expect(mirror.POST_RISER_LEAD).toBe(POST_RISER_LEAD);
+    const shots = [{audioDurationMs: 4072}, {audioDurationMs: 3608}, {audioDurationMs: 4351}, {audioDurationMs: 5373}];
+    const starts: number[] = [];
+    let cursor = 0;
+    for (const s of shots) {
+      starts.push(cursor);
+      cursor += Math.ceil((s.audioDurationMs / 1000) * 30);
+    }
+    expect(mirror.templateCues(shots)).toEqual(postSfxCues(starts, cursor));
+  });
+});

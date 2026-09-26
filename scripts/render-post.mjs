@@ -22,6 +22,7 @@ import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildPostProps} from './build-post-props.mjs';
 import {buildSrt, measureMs, normaliseLoudness} from './lib/post-output.mjs';
+import {templateCues} from './lib/post-cues.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO_DIR = join(ROOT, 'studio');
@@ -140,6 +141,8 @@ const main = async () => {
     voice_id: voiceId,
     music: music ? {src: music.src} : null,
     music_absent_reason: music ? null : (musicAbsentReason ?? null),
+    sfx_cues: props.sfx?.enabled ? templateCues(props.shots) : [],
+    sfx_absent_reason: props.sfx?.enabled ? null : 'the effects library is not staged (run scripts/build-sfx.mjs)',
   });
   console.log(`[render-post] done → ${resultPath}`);
 };
