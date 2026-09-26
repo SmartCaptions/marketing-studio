@@ -28,8 +28,11 @@ const FPS = 30;
 // Frames of music-only lead-in before each VO line starts. Exported so
 // captionTiming.ts places captions on the exact same window as the spoken audio.
 export const VO_LEAD = 12;
-const BASE = 0.35;
-const DUCKED = 0.12;
+export const BASE = 0.35;
+// DUCKED set so EN voice (≈ -23 LUFS) clears ducked music by ≥ 12 dB even when the
+// music section is naturally louder than its integrated average.
+// At 0.07: ducked_music ≈ music_LUFS - 23.1 dB; measured EN gap ≥ 13 dB, HE gap ≥ 18 dB.
+export const DUCKED = 0.07;
 const RAMP = 9;
 const FADE_IN = 24;
 const FADE_OUT = 36;

@@ -70,17 +70,19 @@ describe('postSfxCues', () => {
     expect(cues[0]).toEqual({kind: 'intro', frame: 0});
   });
 
-  it('two shots: intro + riser, no swipes', () => {
-    // Riser starts POST_RISER_LEAD (60) frames before last shot so it ENDS at last shot start.
+  it('two shots: intro + swipe at last boundary + riser', () => {
+    // Every shot boundary (including the last) gets a swipe.
+    // Riser ends at last shot start (ENDS there, so starts POST_RISER_LEAD=60 before).
     const cues = postSfxCues([0, 90], 180);
-    expect(cues.map((c) => c.kind).sort()).toEqual(['intro', 'riser']);
+    expect(cues.map((c) => c.kind).sort()).toEqual(['intro', 'riser', 'swipe']);
+    expect(cues.find((c) => c.kind === 'swipe')?.frame).toBe(90);
     expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(90 - POST_RISER_LEAD);
   });
 
-  it('three shots: intro + one swipe at interior boundary + riser', () => {
+  it('three shots: intro + swipe at each boundary including last + riser', () => {
     const cues = postSfxCues([0, 60, 120], 180);
-    expect(cues.filter((c) => c.kind === 'swipe')).toHaveLength(1);
-    expect(cues.find((c) => c.kind === 'swipe')?.frame).toBe(60);
+    expect(cues.filter((c) => c.kind === 'swipe')).toHaveLength(2);
+    expect(cues.filter((c) => c.kind === 'swipe').map((c) => c.frame)).toEqual([60, 120]);
     expect(cues.find((c) => c.kind === 'riser')?.frame).toBe(120 - POST_RISER_LEAD);
   });
 

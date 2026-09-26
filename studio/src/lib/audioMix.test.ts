@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, shotVoWindows, SFX_SRC, SFX_VOLUME} from './audioMix';
+import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, shotVoWindows, SFX_SRC, SFX_VOLUME, BASE, DUCKED} from './audioMix';
 import type {SfxCue} from './sfxCues';
 
 const TIMING = {
@@ -89,12 +89,12 @@ describe('duckedVolume', () => {
     expect(duckedVolume(200, W, 1350)).toBeCloseTo(0.35, 5);
   });
   it('ducks inside a window', () => {
-    expect(duckedVolume(350, W, 1350)).toBeCloseTo(0.12, 5);
+    expect(duckedVolume(350, W, 1350)).toBeCloseTo(DUCKED, 5);
   });
   it('ramps linearly at the window edge', () => {
     const v = duckedVolume(296, W, 1350); // 4 frames into the 9-frame approach (300-9=291)
-    expect(v).toBeLessThan(0.35);
-    expect(v).toBeGreaterThan(0.12);
+    expect(v).toBeLessThan(BASE);
+    expect(v).toBeGreaterThan(DUCKED);
   });
   it('applies master fades at the ends', () => {
     expect(duckedVolume(0, [], 1350)).toBe(0);

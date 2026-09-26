@@ -123,6 +123,12 @@ export const hybridPostSchema = z.object({
   musicAbsentReason: z.string().nullable().optional(),
   /** Sound-effect cue layer. `enabled` is set by the builder only when sfx files are staged. */
   sfx: z.object({enabled: z.boolean()}).optional(),
+  /**
+   * When true, voice-over <Audio> elements are silenced but the ducking windows remain
+   * active.  Used to produce a music-and-effects-only render for level measurement
+   * (AC-2.1) without re-generating audio props.
+   */
+  muteVoice: z.boolean().optional(),
 });
 
 export type HybridPostProps = z.infer<typeof hybridPostSchema>;
@@ -1658,6 +1664,7 @@ export const HybridPost: React.FC<HybridPostProps> = ({
   shots,
   music,
   sfx,
+  muteVoice = false,
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
@@ -1827,8 +1834,8 @@ export const HybridPost: React.FC<HybridPostProps> = ({
             >
               {ShotComponent}
 
-              {/* Voice-over audio */}
-              {shot.audioSrc ? <Html5Audio src={staticFile(shot.audioSrc)} /> : null}
+              {/* Voice-over audio (suppressed when muteVoice=true; ducking windows still active) */}
+              {shot.audioSrc && !muteVoice ? <Html5Audio src={staticFile(shot.audioSrc)} /> : null}
 
               {/* Captions */}
               <ShotCaptions

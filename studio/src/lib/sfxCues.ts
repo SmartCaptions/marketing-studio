@@ -93,8 +93,9 @@ export const postSfxCues = (
   // Intro hit at the very start of the video.
   cues.push({kind: 'intro', frame: 0});
 
-  // Swipe at each interior shot boundary (not the last shot).
-  for (let i = 1; i < shotStartFrames.length - 1; i++) {
+  // Swipe at every shot boundary including the last one.  The last boundary also gets
+  // a riser (which ends at its start); swipe + riser together mark the ending transition.
+  for (let i = 1; i < shotStartFrames.length; i++) {
     cues.push({kind: 'swipe', frame: shotStartFrames[i]});
   }
 
