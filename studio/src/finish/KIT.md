@@ -84,10 +84,12 @@ writing `cues.json` in your work directory:
 
 Valid kinds: `intro` (punchy hit at the opening), `swipe` (light cut between lines), `riser`
 (rising build before the last line), `closing` (soft ending chime). Frames are absolute (same
-timeline as `shots[i].from`). The riser should start 60 frames before the last line starts so it ENDS exactly at the
-last shot's start (the file is 2 s = 60 frames at 30 fps) —
-`shots[shots.length - 1].from - 60`. The renderer validates each cue and skips invalid ones
-with a warning. All cues are reported in `result.json` under `sfx_cues`.
+timeline as `shots[i].from`). Put a `swipe` at every line boundary including the last one — the
+last boundary gets a swipe AND a riser together, marking the ending transition. The riser should
+start 60 frames before the last line starts so it ENDS exactly at the last shot's start (the file
+is 2 s = 60 frames at 30 fps) — `shots[shots.length - 1].from - 60`. The renderer validates
+each cue and skips invalid ones with a warning. All cues are reported in `result.json` under
+`sfx_cues`.
 
 If you omit `cues.json`, the video renders with no sfx (music only).
 
