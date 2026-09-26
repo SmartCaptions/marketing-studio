@@ -36,14 +36,14 @@ const SCHEMA_VERSION = 1;
  * caption cues from the word-level alignment.
  *
  * @param {{narration: string, sceneIndex: number, label?: string, voiceId: string,
- *          modelId: string, apiKey: string, reelPublicDir: string}} opts
+ *          modelId: string, apiKey: string, language: string, reelPublicDir: string}} opts
  * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array}>}
  */
-const processNarration = async ({narration, sceneIndex, label, voiceId, modelId, apiKey, reelPublicDir}) => {
+const processNarration = async ({narration, sceneIndex, label, voiceId, modelId, apiKey, language, reelPublicDir}) => {
   const tag = label ? ` (${label})` : '';
   console.log(`[build-reel-props] scene ${sceneIndex}${tag}: TTS "${narration.slice(0, 60)}…"`);
 
-  const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(narration, voiceId, modelId, apiKey);
+  const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(narration, voiceId, modelId, apiKey, language);
 
   const audioAbs = join(reelPublicDir, `scene-${sceneIndex}.mp3`);
   writeFileSync(audioAbs, audioBuffer);
@@ -119,6 +119,7 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
         voiceId,
         modelId,
         apiKey,
+        language: lang,
         reelPublicDir,
       });
 
@@ -154,6 +155,7 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       voiceId,
       modelId,
       apiKey,
+      language: lang,
       reelPublicDir,
     });
 

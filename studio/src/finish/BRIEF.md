@@ -39,12 +39,21 @@ The idea's `look` is where that world starts. You may take it further.
 - **Media.** List every media key you show in `USES`. Show real recordings with the label the
   kit puts on them.
 
+## Sound
+
+The composition plays a music bed automatically. You don't add audio — it is already in
+`props.json`. You may optionally place sound-effect cues by writing `cues.json`. Read the
+**Sound** section of `KIT.md` for the exact format and valid kinds. Place the riser 45 frames
+before the last line starts; it is the most effective cue. Omit `cues.json` when none of the
+timing feels right — music alone is fine.
+
 ## How to work
 
 1. Read the inputs.
 2. Decide the visual idea and write the visuals.
 3. Look at stills at the moments that matter (`--frames`) and fix what you see.
-4. Render `--final` once the stills hold up.
+4. Optionally write `cues.json` with the effect cues you want.
+5. Render `--final` once the stills hold up.
 
 A render error tells you what to change. If an approach doesn't work, try another. The session
 has a time limit; finishing with time to spare is better than a last-minute final.

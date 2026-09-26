@@ -34,6 +34,22 @@ const LIBRARY = [
     durationSec: 2.0,
     prompt: 'smooth rising synth riser building tension into a hit, clean upward sweep, no drums, no vocals',
   },
+  // Post-specific cues (used by HybridPost / Finish; sfxCues.ts postSfxCues).
+  {
+    name: 'intro',
+    durationSec: 0.8,
+    prompt: 'punchy intro hit, short crisp impact, modern digital thud with a quick tail, no music, clean',
+  },
+  {
+    name: 'swipe',
+    durationSec: 0.9,
+    prompt: 'light cut swipe, fast soft whoosh with a slight paper flutter, directional left-to-right, no music',
+  },
+  {
+    name: 'closing',
+    durationSec: 0.6,
+    prompt: 'soft closing chime, gentle single bell tone, clean resolution, quiet, no reverb tail',
+  },
 ];
 
 mkdirSync(assetsDir, {recursive: true});

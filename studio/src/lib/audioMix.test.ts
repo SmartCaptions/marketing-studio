@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, SFX_SRC, SFX_VOLUME} from './audioMix';
+import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, shotVoWindows, SFX_SRC, SFX_VOLUME} from './audioMix';
 import type {SfxCue} from './sfxCues';
 
 const TIMING = {
@@ -103,5 +103,36 @@ describe('duckedVolume', () => {
   });
   it('is base volume with no windows mid-video', () => {
     expect(duckedVolume(700, [], 1350)).toBeCloseTo(0.35, 5);
+  });
+});
+
+describe('shotVoWindows', () => {
+  it('returns empty array for empty shots', () => {
+    expect(shotVoWindows([])).toEqual([]);
+  });
+
+  it('maps a single shot to frame 0 through its length', () => {
+    // 1000ms at 30fps = 30 frames
+    const windows = shotVoWindows([{audioDurationMs: 1000}]);
+    expect(windows).toEqual([{fromFrame: 0, toFrame: 30}]);
+  });
+
+  it('packs successive shots end-to-start with no gap', () => {
+    const windows = shotVoWindows([
+      {audioDurationMs: 1000}, // 0-30
+      {audioDurationMs: 2000}, // 30-90
+      {audioDurationMs: 500},  // 90-105
+    ]);
+    expect(windows).toEqual([
+      {fromFrame: 0, toFrame: 30},
+      {fromFrame: 30, toFrame: 90},
+      {fromFrame: 90, toFrame: 105},
+    ]);
+  });
+
+  it('ceils fractional frame counts', () => {
+    // 1100ms at 30fps = 33 frames exactly
+    const windows = shotVoWindows([{audioDurationMs: 1100}]);
+    expect(windows[0].toFrame).toBe(33);
   });
 });

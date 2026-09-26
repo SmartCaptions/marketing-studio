@@ -67,10 +67,10 @@ const main = async () => {
   };
 
   // ─── Step 1: Build props ──────────────────────────────────────────────────
-  let propsPath, props, voiceId;
+  let propsPath, props, voiceId, music, musicAbsentReason;
   try {
     console.log('[render-post] building props…');
-    ({propsPath, props, voiceId} = await buildPostProps({jobPath: jobAbs}));
+    ({propsPath, props, voiceId, music, musicAbsentReason} = await buildPostProps({jobPath: jobAbs}));
   } catch (err) {
     const msg = err.message ?? String(err);
     console.error(`[render-post] props build failed: ${msg}`);
@@ -138,6 +138,8 @@ const main = async () => {
     duration_ms: renderedMs ?? voTotalMs,
     captions: postSrt,
     voice_id: voiceId,
+    music: music ? {src: music.src} : null,
+    music_absent_reason: music ? null : (musicAbsentReason ?? null),
   });
   console.log(`[render-post] done → ${resultPath}`);
 };

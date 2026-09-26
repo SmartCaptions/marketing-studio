@@ -3,9 +3,10 @@
  * layers the factory keeps fixed: the voice-over, word-timed captions and the AI label.
  */
 import React from 'react';
-import {AbsoluteFill, Html5Audio, Sequence, staticFile, type CalculateMetadataFunction} from 'remotion';
+import {AbsoluteFill, Html5Audio, Sequence, staticFile, useVideoConfig, type CalculateMetadataFunction} from 'remotion';
 import {Visuals, USES} from '@work/Visuals';
 import {getBrand} from '../lib/brand';
+import {duckedVolume, resolveSfxLayers, shotVoWindows} from '../lib/audioMix';
 import {AiLabel, COLLAGE_PAPER, ShotCaptions} from '../templates/HybridPost';
 import {FinishProvider, buildTimeline} from './kit';
 import {FPS, type FinishProps} from './schema';
@@ -28,8 +29,35 @@ export const calculateFinishMetadata: CalculateMetadataFunction<FinishProps> = (
 export const Finish: React.FC<FinishProps> = (props) => {
   const timeline = buildTimeline(props.shots);
   const brand = getBrand(props.brandId);
+  const {durationInFrames} = useVideoConfig();
+
+  // Sound layer: music bed with sidechain ducking + session-declared sfx cues.
+  const voWindows = shotVoWindows(props.shots);
+  const sfxEnabled = props.sfxEnabled === true && Array.isArray(props.sfxCues) && props.sfxCues.length > 0;
+  const sfxLayers = sfxEnabled
+    ? resolveSfxLayers(
+        (props.sfxCues ?? []) as import('../lib/sfxCues').SfxCue[],
+        () => true,
+      )
+    : [];
+
   return (
     <AbsoluteFill style={{backgroundColor: props.look === 'collage' ? COLLAGE_PAPER : brand.colors.bg}}>
+      {/* Music bed */}
+      {props.music ? (
+        <Html5Audio
+          src={staticFile(props.music.src)}
+          volume={(f) => duckedVolume(f, voWindows, durationInFrames)}
+        />
+      ) : null}
+
+      {/* SFX cue layer */}
+      {sfxLayers.map((layer, i) => (
+        <Sequence key={`sfx-${i}`} from={layer.frame}>
+          <Html5Audio src={staticFile(layer.src)} volume={() => layer.volume} />
+        </Sequence>
+      ))}
+
       <FinishProvider props={props} timeline={timeline}>
         <Visuals />
       </FinishProvider>
