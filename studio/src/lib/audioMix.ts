@@ -29,10 +29,9 @@ const FPS = 30;
 // captionTiming.ts places captions on the exact same window as the spoken audio.
 export const VO_LEAD = 12;
 export const BASE = 0.35;
-// DUCKED set so EN voice (≈ -23 LUFS) clears ducked music by ≥ 12 dB even when the
-// music section is naturally louder than its integrated average.
-// At 0.07: ducked_music ≈ music_LUFS - 23.1 dB; measured EN gap ≥ 13 dB, HE gap ≥ 18 dB.
-export const DUCKED = 0.07;
+// Directed videos level their music to the voice first (scripts/lib/postMusic.mjs), so this
+// duck keeps the voice about 18 dB above the music whatever loudness the track comes in at.
+export const DUCKED = 0.12;
 const RAMP = 9;
 const FADE_IN = 24;
 const FADE_OUT = 36;

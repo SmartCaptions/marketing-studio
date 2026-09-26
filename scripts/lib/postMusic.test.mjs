@@ -1,10 +1,11 @@
 // node --test scripts/lib/postMusic.test.mjs
 import {test, describe} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';
+import {existsSync, mkdtempSync, writeFileSync, rmSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {buildMusicPrompt, generatePostMusic} from './postMusic.mjs';
+import {buildMusicPrompt, generatePostMusic, levelToVoice, measureLufs} from './postMusic.mjs';
 
 // ─── buildMusicPrompt ────────────────────────────────────────────────────────
 
@@ -124,6 +125,44 @@ describe('generatePostMusic feeder failure', () => {
       assert.equal(result.music, null);
       assert.ok(typeof result.musicAbsentReason === 'string' && result.musicAbsentReason.length > 0,
         `expected absent reason, got: ${result.musicAbsentReason}`);
+    } finally {
+      rmSync(dir, {recursive: true, force: true});
+    }
+  });
+});
+
+// ─── levelToVoice ────────────────────────────────────────────────────────────
+
+describe('levelToVoice', () => {
+  const tone = (path, db) => {
+    const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i',
+      'sine=frequency=440:duration=4', '-af', `volume=${db}dB`, path]);
+    assert.equal(r.status, 0);
+  };
+
+  test('brings a hot track to the voice loudness (±1 LU)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'postMusic-level-'));
+    try {
+      const voice = join(dir, 'voice.mp3');
+      const raw = join(dir, 'raw.mp3');
+      const out = join(dir, 'music.mp3');
+      tone(voice, -20);
+      tone(raw, -4);
+      const gain = levelToVoice({rawPath: raw, outPath: out, voiceFiles: [voice]});
+      assert.ok(gain !== null && gain < -10, `expected a large cut, got ${gain}`);
+      assert.ok(Math.abs(measureLufs([out]) - measureLufs([voice])) <= 1);
+    } finally {
+      rmSync(dir, {recursive: true, force: true});
+    }
+  });
+
+  test('leaves an unreadable track unlevelled rather than failing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'postMusic-level-'));
+    try {
+      const raw = join(dir, 'raw.mp3');
+      writeFileSync(raw, 'not audio');
+      assert.equal(levelToVoice({rawPath: raw, outPath: join(dir, 'music.mp3'), voiceFiles: [raw]}), null);
+      assert.ok(existsSync(join(dir, 'music.mp3')));
     } finally {
       rmSync(dir, {recursive: true, force: true});
     }

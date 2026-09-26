@@ -140,6 +140,7 @@ export const prepareFinish = async ({jobPath, workDir}) => {
     look: post.look,
     postType: job.post_type,
     root: ROOT,
+    voiceFiles: shots.map((s) => join(publicRoot, s.audioSrc)),
   });
   if (musicAbsentReason) {
     console.warn(`[finish-prepare] music absent: ${musicAbsentReason}`);

@@ -328,6 +328,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
     look: job.look,
     postType: job.post_type,
     root: ROOT,
+    voiceFiles: processedShots.map((s) => join(publicRoot, s.audioSrc)),
   });
   if (musicAbsentReason) {
     console.warn(`[build-post-props] music absent: ${musicAbsentReason}`);

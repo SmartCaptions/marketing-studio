@@ -7,12 +7,46 @@
  *
  * Any failure is non-fatal: the caller records the reason, and the video renders voice-only.
  */
-import {existsSync, readFileSync, writeFileSync} from 'node:fs';
+import {copyFileSync, existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {spawnSync} from 'node:child_process';
 
 // Duration tolerance for the cache check (ms). A change smaller than this reuses the existing track.
 const DURATION_TOLERANCE_MS = 1_000;
+
+/** Integrated loudness (LUFS) of the given audio files played back to back; null when unmeasurable */
+export const measureLufs = (files) => {
+  if (files.length === 0) return null;
+  const inputs = files.flatMap((f) => ['-i', f]);
+  const joined = files.map((_, i) => `[${i}:a]`).join('') + `concat=n=${files.length}:v=0:a=1,ebur128`;
+  const proc = spawnSync('ffmpeg', ['-hide_banner', '-nostats', ...inputs, '-filter_complex', joined, '-f', 'null', '-'],
+    {encoding: 'utf8', timeout: 120_000});
+  const found = [...(proc.stderr ?? '').matchAll(/I:\s+(-?[\d.]+) LUFS/g)];
+  const value = found.length ? Number(found[found.length - 1][1]) : NaN;
+  return Number.isFinite(value) ? value : null;
+};
+
+/**
+ * Write the music at the voice's loudness, so the duck in audioMix.ts sets the gap between them
+ * whatever loudness the generated track came in at. Falls back to the unlevelled track.
+ */
+export const levelToVoice = ({rawPath, outPath, voiceFiles}) => {
+  const voice = measureLufs(voiceFiles);
+  const music = measureLufs([rawPath]);
+  if (voice === null || music === null) {
+    copyFileSync(rawPath, outPath);
+    return null;
+  }
+  const gainDb = Math.round((voice - music) * 10) / 10;
+  const proc = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', rawPath,
+    '-af', `volume=${gainDb}dB,alimiter=limit=0.9`, '-c:a', 'libmp3lame', '-b:a', '192k', outPath],
+    {encoding: 'utf8', timeout: 120_000});
+  if (proc.status !== 0) {
+    copyFileSync(rawPath, outPath);
+    return null;
+  }
+  return gainDb;
+};
 
 /**
  * Build a music generation prompt from the idea's language, look and post type.
@@ -55,6 +89,7 @@ export const buildMusicPrompt = (language, look, postType) => {
  *   look: 'studio'|'collage',
  *   postType?: string,
  *   root: string,           marketing-studio repo root (for the audio feeder)
+ *   voiceFiles: string[],   absolute paths of the voice-over lines, to level the music to
  * }} opts
  * @returns {Promise<{music: {src: string, durationMs: number}|null, musicAbsentReason: string|null}>}
  */
@@ -66,27 +101,38 @@ export const generatePostMusic = async ({
   look,
   postType,
   root,
+  voiceFiles = [],
 }) => {
   const musicPath = join(postPublicDir, 'music.mp3');
+  const rawPath = join(postPublicDir, 'music-raw.mp3');
   const metaPath = join(postPublicDir, 'music-meta.json');
+  // Tracks cached before levelling existed kept the generated file as music.mp3
+  if (!existsSync(rawPath) && existsSync(musicPath) && existsSync(metaPath)) copyFileSync(musicPath, rawPath);
+  const levelled = () => {
+    const gainDb = levelToVoice({rawPath, outPath: musicPath, voiceFiles});
+    console.log(gainDb === null ? '[postMusic] music left unlevelled (loudness unmeasurable)' : `[postMusic] music levelled to the voice (${gainDb} dB)`);
+  };
 
   // Check cache: reuse if the existing track is close enough in duration, look and language.
-  if (existsSync(musicPath) && existsSync(metaPath)) {
+  if (existsSync(rawPath) && existsSync(metaPath)) {
+    let meta = null;
     try {
-      const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
-      if (
-        Math.abs(meta.durationMs - totalDurationMs) <= DURATION_TOLERANCE_MS &&
-        meta.look === look &&
-        meta.language === language
-      ) {
-        console.log('[postMusic] reusing cached music track');
-        return {
-          music: {src: relative(publicRoot, musicPath), durationMs: meta.durationMs},
-          musicAbsentReason: null,
-        };
-      }
+      meta = JSON.parse(readFileSync(metaPath, 'utf8'));
     } catch {
       // Corrupt meta — regenerate
+    }
+    if (
+      meta &&
+      Math.abs(meta.durationMs - totalDurationMs) <= DURATION_TOLERANCE_MS &&
+      meta.look === look &&
+      meta.language === language
+    ) {
+      console.log('[postMusic] reusing cached music track');
+      levelled();
+      return {
+        music: {src: relative(publicRoot, musicPath), durationMs: meta.durationMs},
+        musicAbsentReason: null,
+      };
     }
   }
 
@@ -101,7 +147,7 @@ export const generatePostMusic = async ({
       'music',
       '--prompt', prompt,
       '--length-ms', String(totalDurationMs),
-      '--out', musicPath,
+      '--out', rawPath,
     ],
     {cwd: root, encoding: 'utf8', timeout: 360_000},
   );
@@ -110,10 +156,12 @@ export const generatePostMusic = async ({
     // Documented silent fallback: no key → no music.
     return {music: null, musicAbsentReason: 'ELEVENLABS_API_KEY absent — voice-only render'};
   }
-  if (result.status !== 0 || !existsSync(musicPath)) {
+  if (result.status !== 0 || !existsSync(rawPath)) {
     const err = (result.stderr ?? '').slice(0, 200) || `feeder exited ${result.status}`;
     return {music: null, musicAbsentReason: `music generation failed: ${err}`};
   }
+
+  levelled();
 
   // Write cache metadata.
   const meta = {durationMs: totalDurationMs, look, language, generatedAt: new Date().toISOString()};
