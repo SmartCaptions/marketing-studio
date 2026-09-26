@@ -30,6 +30,7 @@ export const Finish: React.FC<FinishProps> = (props) => {
   const timeline = buildTimeline(props.shots);
   const brand = getBrand(props.brandId);
   const {durationInFrames} = useVideoConfig();
+  const muteVoice = props.muteVoice ?? false;
 
   // Sound layer: music bed with sidechain ducking + session-declared sfx cues.
   const voWindows = shotVoWindows(props.shots);
@@ -63,7 +64,8 @@ export const Finish: React.FC<FinishProps> = (props) => {
       </FinishProvider>
       {props.shots.map((shot, i) => (
         <Sequence key={i} from={timeline.shots[i].from} durationInFrames={timeline.shots[i].durationInFrames}>
-          {shot.audioSrc ? <Html5Audio src={staticFile(shot.audioSrc)} /> : null}
+          {/* Voice-over audio (suppressed when muteVoice=true; ducking windows stay active) */}
+          {shot.audioSrc && !muteVoice ? <Html5Audio src={staticFile(shot.audioSrc)} /> : null}
           <ShotCaptions
             captions={shot.captions}
             look={props.look}

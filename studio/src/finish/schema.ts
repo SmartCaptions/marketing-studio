@@ -70,6 +70,9 @@ export const finishPropsSchema = z.object({
   sfxCues: z.array(sfxCueSchema).optional(),
   /** True when sfx files are staged (set by prepare step). */
   sfxEnabled: z.boolean().optional(),
+  /** When true, voice-over <Audio> elements are suppressed but ducking windows stay active.
+   *  Used for music-only renders to measure per-window ducked-music LUFS. */
+  muteVoice: z.boolean().optional(),
 });
 
 export type FinishProps = z.infer<typeof finishPropsSchema>;
