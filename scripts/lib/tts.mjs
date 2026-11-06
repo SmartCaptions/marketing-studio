@@ -20,7 +20,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Model to use per language. All languages use eleven_v4 (the current latest). */
 export const MODEL_FOR_LANG = {he: 'eleven_v4', en: 'eleven_v4', ar: 'eleven_v4'};
 
-/** Retries after an ElevenLabs 429 or 5xx: three more attempts, backing off 1 s, 2 s, 4 s. */
+/**
+ * Retries after an ElevenLabs 429, and only a 429: three more attempts, backing off 1 s, 2 s, 4 s.
+ * A 5xx or a timeout may already have been billed, and the account's character allowance is fixed
+ * with no overage, so those fail at once (the same rule as video-factory's text-to-speech).
+ */
 export const TTS_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,7 +190,7 @@ export const stretchAudio = (audioBuffer, tempo) => {
  * @param {'he'|'en'|'ar'} [language='en']
  * @param {{tag?: string|null, stability?: number|null, tempo?: number|null}} [langSettings]
  * @param {{retryDelaysMs?: number[], sleep?: (ms: number) => Promise<void>}} [options]
- *   Waits before each retry of a 429 or 5xx (default TTS_RETRY_DELAYS_MS), and how to wait.
+ *   Waits before each retry of a 429 (default TTS_RETRY_DELAYS_MS), and how to wait.
  * @returns {Promise<{audioBuffer: Buffer, alignment: object, durationMs: number}>}
  */
 export const callTtsWithTimestamps = async (
@@ -222,8 +226,7 @@ export const callTtsWithTimestamps = async (
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(TTS_TIMEOUT),
     });
-    const retryable = res.status === 429 || res.status >= 500;
-    if (res.ok || !retryable || attempt >= retryDelaysMs.length) break;
+    if (res.status !== 429 || attempt >= retryDelaysMs.length) break;
     await wait(retryDelaysMs[attempt]);
   }
 

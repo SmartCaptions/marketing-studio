@@ -224,7 +224,7 @@ describe('callTtsWithTimestamps', () => {
 
   test('a 429 is retried after each delay and the call then succeeds', async () => {
     waits.length = 0;
-    const fetchStub = withStatuses(429, 503, 200);
+    const fetchStub = withStatuses(429, 429, 200);
     try {
       const result = await callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options);
       assert.ok(result.audioBuffer.length > 0);
@@ -233,17 +233,52 @@ describe('callTtsWithTimestamps', () => {
     assert.deepEqual(waits, [5, 10]);
   });
 
-  test('after the last delay the error is reported with its status', async () => {
+  test('after the last delay a 429 is reported with its status', async () => {
     waits.length = 0;
-    const fetchStub = withStatuses(500);
+    const fetchStub = withStatuses(429);
     try {
       await assert.rejects(
         () => callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options),
-        /ElevenLabs 500/,
+        /ElevenLabs 429/,
       );
     } finally { fetchStub.restore(); }
     assert.equal(fetchStub.calls.length, 4);
     assert.deepEqual(waits, [5, 10, 20]);
+  });
+
+  // Billing safety: a 5xx may already have been billed against a fixed character allowance with
+  // no overage, so only a 429 is retried (video-factory's rule for text-to-speech).
+  for (const status of [500, 503]) {
+    test(`a ${status} is not retried: one call, the error is thrown at once`, async () => {
+      waits.length = 0;
+      const fetchStub = withStatuses(status, 200);
+      try {
+        await assert.rejects(
+          () => callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options),
+          {message: `ElevenLabs ${status}: busy`},
+        );
+      } finally { fetchStub.restore(); }
+      assert.equal(fetchStub.calls.length, 1);
+      assert.deepEqual(waits, []);
+    });
+  }
+
+  test('a network error or timeout is not retried', async () => {
+    waits.length = 0;
+    const origFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      throw new TypeError('fetch failed');
+    };
+    try {
+      await assert.rejects(
+        () => callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options),
+        /fetch failed/,
+      );
+    } finally { globalThis.fetch = origFetch; }
+    assert.equal(calls, 1);
+    assert.deepEqual(waits, []);
   });
 
   test('an error a retry cannot fix is reported at once', async () => {
