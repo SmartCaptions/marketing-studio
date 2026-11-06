@@ -68,12 +68,15 @@ writeFileSync(propsPath, JSON.stringify(props));
 
 // Run Remotion renderStill
 try {
+  // stderr is captured so a failure can name its cause, not just the command that ran.
   execSync(
     `npx remotion still Thumbnail "${outAbs}" --props="${propsPath}"`,
-    {cwd: STUDIO_DIR, stdio: 'inherit', timeout: 120_000},
+    {cwd: STUDIO_DIR, stdio: ['ignore', 'inherit', 'pipe'], timeout: 120_000},
   );
 } catch (err) {
-  console.error(`render-thumbnail: Remotion still render failed: ${err.message.slice(0, 200)}`);
+  const lines = String(err.stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const cause = lines.at(-1) ?? err.message.split('\n')[0];
+  console.error(`render-thumbnail: Remotion still render failed: ${cause.slice(0, 200)}`);
   process.exit(1);
 }
 
