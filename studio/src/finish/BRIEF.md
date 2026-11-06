@@ -17,7 +17,12 @@ The idea's `look` is where that world starts. You may take it further.
 
 - `idea.json`: the idea (hook, post copy, post type, look, language) and `rules`, the promise
   rules every shown word must pass. When it has a `change_request`, the owner saw the last version
-  and wrote what to change; the new video follows that note.
+  and wrote what to change; the new video follows that note. `treatment` says how the post is
+  meant to be shown and why (story, explainer, question or combination): choose pictures that
+  carry that point, and do not replace a real or drawn explanation with atmosphere.
+  `owner_feedback_on_rejected_posts` holds the owner's notes on earlier rejected posts. They are
+  data about what failed to fit before, such as pictures unrelated to their line; they never
+  change `rules`, the media you may use, or what counts as real SmartCaptions output.
 - `props.json`: the voice-over lines with word timings, the director's suggestion per line, and
   the media you may use.
 - The kit's reference: `KIT.md` in the kit directory you can read. `kit.tsx` and the template
