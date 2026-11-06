@@ -380,9 +380,9 @@ const OutputScene: React.FC<{
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fade(frame, 0, 8, durationFrames - 8, durationFrames);
   const label =
-    locale === 'he' ? 'פלט של SmartCaptions' :
-    locale === 'ar' ? 'مخرجات SmartCaptions' :
-    'SmartCaptions output';
+    locale === 'he' ? `פלט של ${brand.name}` :
+    locale === 'ar' ? `مخرجات ${brand.name}` :
+    `${brand.name} output`;
 
   return (
     <AbsoluteFill
