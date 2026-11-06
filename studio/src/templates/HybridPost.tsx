@@ -53,7 +53,7 @@ import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {duckedVolume, resolveSfxLayers, shotVoWindows, voiceDuck} from '../lib/audioMix';
 import {loadHybridPostFonts} from '../lib/fonts';
-import {isRtl} from '../lib/locale';
+import {aiDisclosureLabel, isRtl} from '../lib/locale';
 import {brandSpring} from '../lib/motion';
 import {postSfxCues} from '../lib/sfxCues';
 import {phrasesToFrameCues} from '../lib/wordCaptions';
@@ -264,10 +264,7 @@ export const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
   const dir = isRtl(language) ? 'rtl' : 'ltr';
-  const text =
-    language === 'he' ? 'הוויזואליה נוצרה בבינה מלאכותית' :
-    language === 'ar' ? 'مرئيات مولّدة بالذكاء الاصطناعي' :
-    'AI-generated visuals';
+  const text = aiDisclosureLabel(language);
 
   if (look === 'collage') {
     // Place in the top margin (above SAFE_TOP) so it never touches shot headings.

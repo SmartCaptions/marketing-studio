@@ -23,3 +23,11 @@ export const isRtl = (locale?: string | null): boolean =>
 
 /** Return the CSS `dir` attribute value for the locale. */
 export const localeDir = (locale?: string | null): Dir => (isRtl(locale) ? 'rtl' : 'ltr');
+
+/** The on-screen "AI-generated visuals" label, in the locale's language. */
+export const aiDisclosureLabel = (locale?: string | null): string =>
+  isHebrew(locale)
+    ? 'הוויזואליה נוצרה בבינה מלאכותית'
+    : isArabic(locale)
+      ? 'مرئيات مولّدة بالذكاء الاصطناعي'
+      : 'AI-generated visuals';

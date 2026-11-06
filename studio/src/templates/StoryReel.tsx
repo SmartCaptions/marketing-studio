@@ -34,7 +34,7 @@ import {
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {loadLocaleFonts} from '../lib/fonts';
-import {isRtl} from '../lib/locale';
+import {aiDisclosureLabel, isRtl} from '../lib/locale';
 import {brandSpring} from '../lib/motion';
 import {getHeroMark} from '../brands/marks';
 import {phrasesToFrameCues} from '../lib/wordCaptions';
@@ -317,10 +317,7 @@ const AiDisclosureLabel: React.FC<{
   const brand = getBrand(brandId);
   const fonts = loadLocaleFonts(brand, locale);
   const dir = isRtl(locale) ? 'rtl' : 'ltr';
-  const text =
-    locale === 'he' ? 'הוויזואליה נוצרה בבינה מלאכותית' :
-    locale === 'ar' ? 'مرئيات مولّدة بالذكاء الاصطناعي' :
-    'AI-generated visuals';
+  const text = aiDisclosureLabel(locale);
 
   return (
     <div
