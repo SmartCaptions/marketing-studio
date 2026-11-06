@@ -25,11 +25,11 @@ export const MODEL_FOR_LANG = {he: 'eleven_v4', en: 'eleven_v4', ar: 'eleven_v4'
  * the brand JSON block is the source of truth so the owner can tune without code changes.
  *   - stability 0 for a lighter, more expressive delivery
  *   - [cheerfully] prefix tag for the required tone
- *   - 1.15× time-stretch post-TTS (atempo=1.15 => 1/1.15 of original length)
+ *   - 1.05× time-stretch post-TTS (atempo=1.05 => 1/1.05 of original length)
  */
 export const HEBREW_TAG = '[cheerfully] ';
 export const HEBREW_STABILITY = 0;
-export const HEBREW_TEMPO = 1.15;
+export const HEBREW_TEMPO = 1.05;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // .env reader
@@ -153,7 +153,7 @@ export const stripLeadingTag = (characters, startSecs, endSecs) => {
  * unavailable or fails — callers treat audio-stretch failure as non-fatal.
  *
  * @param {Buffer} audioBuffer
- * @param {number} tempo - e.g. 1.15 to get 1/1.15 of original length
+ * @param {number} tempo - e.g. 1.05 to get 1/1.05 of original length
  * @returns {Buffer}
  */
 export const stretchAudio = (audioBuffer, tempo) => {
@@ -194,7 +194,7 @@ export const stretchAudio = (audioBuffer, tempo) => {
  *   - `stability`: optional voice_settings.stability override.
  *   - `tempo`:     optional post-TTS atempo stretch (> 1 speeds up / shortens).
  *
- * Hebrew defaults: tag='[cheerfully] ', stability=0, tempo=1.15.
+ * Hebrew defaults: tag='[cheerfully] ', stability=0, tempo=1.05.
  * English/Arabic defaults: no tag, no stability override, no stretch.
  *
  * @param {string} text

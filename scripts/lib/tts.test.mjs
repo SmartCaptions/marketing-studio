@@ -204,8 +204,8 @@ describe('callTtsWithTimestamps', () => {
     );
   });
 
-  test('HEBREW_TEMPO constant is 1.15', () => {
-    assert.equal(HEBREW_TEMPO, 1.15);
+  test('HEBREW_TEMPO constant is 1.05', () => {
+    assert.equal(HEBREW_TEMPO, 1.05);
   });
 
   test('HEBREW_STABILITY constant is 0', () => {

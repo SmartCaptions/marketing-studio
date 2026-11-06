@@ -209,10 +209,10 @@ placeholder so smoke stays green on a clean clone.
 - Supported languages: `he` (Hebrew), `en` (English), `ar` (Modern Standard Arabic).
   Voices are configured per-brand in `brands/<id>.json` under `voices.{he,en,ar}`.
   Per-language TTS settings (tag, stability, tempo) live under `ttsSettings.<lang>` in
-  the same file. Hebrew defaults: `[cheerfully]` tag, stability 0, tempo 1.15×.
+  the same file. Hebrew defaults: `[cheerfully]` tag, stability 0, tempo 1.05× (measured on eleven_v4 to match the owner-chosen sample F).
   Arabic uses `Noto Sans Arabic` (loaded via `@remotion/google-fonts`) for RTL rendering.
 - Hebrew TTS (`scripts/lib/tts.mjs`): the lighter quicker read is stability 0 plus a
-  `[cheerfully] ` tag, then `atempo=1.15` with the character timings divided by 1.15.
+  `[cheerfully] ` tag, then `atempo` at the brand tempo (1.05) with the character timings divided by it.
   The with-timestamps alignment returns the tag as characters; they are dropped before
   words are built. These values are now read from `ttsSettings.he` in the brand JSON.
 - Thumbnail: `node scripts/render-thumbnail.mjs --title "<text>" --language he|en|ar --out <abs.png>`
