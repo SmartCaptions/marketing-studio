@@ -1,9 +1,11 @@
 // node --test scripts/lib/tts.test.mjs
 import {test, describe} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {
   MODEL_FOR_LANG,
   getLangSettings,
+  getVoiceId,
   stripLeadingTag,
   stretchAudio,
   callTtsWithTimestamps,
@@ -61,6 +63,33 @@ describe('getLangSettings', () => {
     assert.equal(s.tag, null);
     assert.equal(s.stability, null);
     assert.equal(s.tempo, null);
+  });
+});
+
+// ─── getVoiceId ──────────────────────────────────────────────────────────────
+
+// README "Voices": brands/smartcaptions.json holds a default voice for he, en and ar under `voices`.
+const SMARTCAPTIONS = JSON.parse(readFileSync(new URL('../../brands/smartcaptions.json', import.meta.url), 'utf8'));
+
+describe('getVoiceId', () => {
+  test('returns the brand JSON voice for each of he, en and ar', () => {
+    for (const language of ['he', 'en', 'ar']) {
+      const id = getVoiceId(SMARTCAPTIONS, language);
+      assert.equal(id, SMARTCAPTIONS.voices[language]);
+      assert.ok(id.length > 0, `${language} voice is empty`);
+    }
+  });
+
+  test('a brand with no voice for the language throws a clear error naming the language', () => {
+    const {ar: _ar, ...withoutAr} = SMARTCAPTIONS.voices;
+    const brand = {...SMARTCAPTIONS, voices: withoutAr};
+    assert.throws(() => getVoiceId(brand, 'ar'), /no entry for language "ar"/);
+    assert.equal(getVoiceId(brand, 'en'), SMARTCAPTIONS.voices.en);
+  });
+
+  test('a brand with no voices block throws a clear error', () => {
+    const {voices: _voices, ...withoutVoices} = SMARTCAPTIONS;
+    assert.throws(() => getVoiceId(withoutVoices, 'en'), /missing a "voices" block/);
   });
 });
 
@@ -275,6 +304,29 @@ describe('callTtsWithTimestamps', () => {
       await assert.rejects(
         () => callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options),
         /fetch failed/,
+      );
+    } finally { globalThis.fetch = origFetch; }
+    assert.equal(calls, 1);
+    assert.deepEqual(waits, []);
+  });
+
+  test('a voice ElevenLabs refuses (404 voice_not_found) is reported with its body and not retried', async () => {
+    waits.length = 0;
+    const refusal = '{"detail":{"status":"voice_not_found","message":"A voice with the voice_id missing-voice was not found."}}';
+    const origFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return {ok: false, status: 404, text: async () => refusal};
+    };
+    try {
+      await assert.rejects(
+        () => callTtsWithTimestamps('ט', 'missing-voice', 'eleven_v4', 'fake-key', 'en', {}, options),
+        (err) => {
+          assert.ok(err.message.startsWith('ElevenLabs 404'), err.message);
+          assert.match(err.message, /voice_not_found/);
+          return true;
+        },
       );
     } finally { globalThis.fetch = origFetch; }
     assert.equal(calls, 1);
