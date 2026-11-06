@@ -112,7 +112,7 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({brandId, title, language}) 
             fontFamily: fonts.body,
             fontSize: 28,
             fontWeight: 600,
-            color: brand.colors.brand,
+            color: brand.colors.info,
             letterSpacing: '0.04em',
           }}
         >
