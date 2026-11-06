@@ -14,7 +14,7 @@
  * Exit 0 on success, exit 1 with one sentence to stderr on failure.
  */
 import {execSync} from 'node:child_process';
-import {mkdirSync, writeFileSync} from 'node:fs';
+import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
@@ -66,7 +66,8 @@ const propsPath = `${propsDir}/thumbnail-props.json`;
 const props = {brandId, title, language};
 writeFileSync(propsPath, JSON.stringify(props));
 
-// Run Remotion renderStill
+// Run Remotion renderStill. The temp directory is removed on both paths, before any exit.
+let failure = null;
 try {
   // stderr is captured so a failure can name its cause, not just the command that ran.
   execSync(
@@ -76,7 +77,12 @@ try {
 } catch (err) {
   const lines = String(err.stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
   const cause = lines.at(-1) ?? err.message.split('\n')[0];
-  console.error(`render-thumbnail: Remotion still render failed: ${cause.slice(0, 200)}`);
+  failure = `render-thumbnail: Remotion still render failed: ${cause.slice(0, 200)}`;
+} finally {
+  rmSync(propsDir, {recursive: true, force: true});
+}
+if (failure) {
+  console.error(failure);
   process.exit(1);
 }
 
