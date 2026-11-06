@@ -186,7 +186,7 @@ Scene kinds:
 | `video` | path to MP4 | spoken text | — |
 | `output` | — | spoken text | 1–6 verbatim SRT lines |
 
-Language `"he"` uses `eleven_v3` model (Hebrew-certified); `"en"` uses `eleven_multilingual_v2`.
+Languages are `"he"`, `"en"` and `"ar"` (Modern Standard Arabic, right to left like Hebrew). Every line is spoken by `eleven_v4`; see `MODEL_FOR_LANG` in `scripts/lib/tts.mjs`. An optional top-level `"voice_id"` in the job narrates every line with that voice; without one the brand JSON's `voices.<language>` is used. `result.json` reports the `voice_id`, `model` and `narration` (`[{text, audio}]`) it used.
 
 ### Calling render-reel
 
@@ -203,18 +203,26 @@ Exit 0 on success. Non-zero means `result.json` carries the error.
 
 ### Voices
 
-Add a `voices` block to `brands/smartcaptions.json`:
+`brands/smartcaptions.json` holds each language's default voice, and how it is delivered:
 
 ```json
 {
   "voices": {
     "he": "<elevenlabs-voice-id-for-hebrew>",
-    "en": "<elevenlabs-voice-id-for-english>"
+    "en": "<elevenlabs-voice-id-for-english>",
+    "ar": "<elevenlabs-voice-id-for-arabic>"
+  },
+  "ttsSettings": {
+    "he": {"tag": "[cheerfully] ", "stability": 0, "tempo": 1.05}
   }
 }
 ```
 
-Voice IDs default to Rachel (`21m00Tcm4TlvDq8ikWAM`). Set `ELEVENLABS_API_KEY` in `.env`.
+`ttsSettings.<language>` is optional: `tag` is spoken before the line (its characters are dropped
+from the captions), `stability` overrides the voice's stability, and `tempo` stretches the audio
+(and the caption timings with it). BrAInd chooses a voice for each idea from its own registry and
+passes it as the job's `voice_id`; the defaults here are for jobs that carry none. Set
+`ELEVENLABS_API_KEY` in `.env`.
 
 ### Safe areas
 

@@ -52,7 +52,7 @@ export const levelToVoice = ({rawPath, outPath, voiceFiles}) => {
  * Build a music generation prompt from the idea's language, look and post type.
  * Describes mood, instruments and tempo only — no artist names (PLAYBOOK rule).
  *
- * @param {'he'|'en'} language
+ * @param {'he'|'en'|'ar'} language
  * @param {'studio'|'collage'} look
  * @param {string|undefined} postType
  * @returns {string}
@@ -63,6 +63,7 @@ export const buildMusicPrompt = (language, look, postType) => {
       ? 'warm acoustic background, light guitar or piano, organic feel, 95 BPM'
       : 'modern electronic background, clean production, 115 BPM';
 
+  // Hebrew is upbeat (the owner's pick); every other language, Arabic included, keeps the calm default.
   const langFeel =
     language === 'he'
       ? 'upbeat and energetic, driving rhythm, positive'
@@ -85,7 +86,7 @@ export const buildMusicPrompt = (language, look, postType) => {
  *   postPublicDir: string,  absolute path to the post's public directory
  *   publicRoot: string,     absolute path to the Remotion public root
  *   totalDurationMs: number,
- *   language: 'he'|'en',
+ *   language: 'he'|'en'|'ar',
  *   look: 'studio'|'collage',
  *   postType?: string,
  *   root: string,           marketing-studio repo root (for the audio feeder)

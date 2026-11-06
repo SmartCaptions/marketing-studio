@@ -2,9 +2,6 @@
 import {test, describe} from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  HEBREW_TAG,
-  HEBREW_STABILITY,
-  HEBREW_TEMPO,
   MODEL_FOR_LANG,
   getLangSettings,
   stripLeadingTag,
@@ -22,15 +19,18 @@ describe('MODEL_FOR_LANG', () => {
   });
 });
 
+/** Hebrew delivery as brands/smartcaptions.json sets it, passed explicitly to the call under test. */
+const HEBREW = {tag: '[cheerfully] ', stability: 0, tempo: 1.05};
+
 // ─── getLangSettings ─────────────────────────────────────────────────────────
 
 describe('getLangSettings', () => {
-  test('Hebrew falls back to built-in defaults when ttsSettings absent', () => {
+  test('Hebrew has no delivery settings of its own: the brand JSON is the only source', () => {
     const brand = {voices: {he: 'v1'}};
     const s = getLangSettings(brand, 'he');
-    assert.equal(s.tag, HEBREW_TAG);
-    assert.equal(s.stability, HEBREW_STABILITY);
-    assert.equal(s.tempo, HEBREW_TEMPO);
+    assert.equal(s.tag, null);
+    assert.equal(s.stability, null);
+    assert.equal(s.tempo, null);
   });
 
   test('Hebrew reads overrides from brand JSON', () => {
@@ -151,10 +151,10 @@ describe('callTtsWithTimestamps', () => {
     const patch = patchFetch(fakeAlignFor('[cheerfully] ט'));
     try {
       await callTtsWithTimestamps('טוב', 'voice-he', 'eleven_v4', 'fake-key', 'he',
-        {tag: HEBREW_TAG, stability: HEBREW_STABILITY, tempo: HEBREW_TEMPO});
+        HEBREW);
     } finally { patch.restore(); }
     assert.ok(patch.captured.url.endsWith('/with-timestamps'));
-    assert.equal(patch.captured.body.text, `${HEBREW_TAG}טוב`);
+    assert.equal(patch.captured.body.text, '[cheerfully] טוב');
     assert.equal(patch.captured.body.model_id, 'eleven_v4');
     assert.deepEqual(patch.captured.body.voice_settings, {stability: 0});
   });
@@ -193,22 +193,69 @@ describe('callTtsWithTimestamps', () => {
     let resultAlignment;
     try {
       const result = await callTtsWithTimestamps('ט', 'voice-he', 'eleven_v4', 'fake-key', 'he',
-        {tag: HEBREW_TAG, stability: HEBREW_STABILITY, tempo: HEBREW_TEMPO});
+        HEBREW);
       resultAlignment = result.alignment;
     } finally { patch.restore(); }
     assert.equal(resultAlignment.characters.length, 1);
-    const expectedStart = allStarts[tagPlusSpace.length] / HEBREW_TEMPO;
+    const expectedStart = allStarts[tagPlusSpace.length] / HEBREW.tempo;
     assert.ok(
       Math.abs(resultAlignment.character_start_times_seconds[0] - expectedStart) < 0.001,
       `start ${resultAlignment.character_start_times_seconds[0]} ≈ ${expectedStart}`,
     );
   });
 
-  test('HEBREW_TEMPO constant is 1.05', () => {
-    assert.equal(HEBREW_TEMPO, 1.05);
+  const withStatuses = (...statuses) => {
+    const origFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url, opts) => {
+      calls.push({url, body: JSON.parse(opts.body)});
+      const status = statuses[Math.min(calls.length - 1, statuses.length - 1)];
+      return {
+        ok: status === 200,
+        status,
+        text: async () => 'busy',
+        json: async () => ({audio_base64: Buffer.alloc(100).toString('base64'), alignment: fakeAlignFor('ט')}),
+      };
+    };
+    return {calls, restore: () => { globalThis.fetch = origFetch; }};
+  };
+  const waits = [];
+  const options = {retryDelaysMs: [5, 10, 20], sleep: async (ms) => { waits.push(ms); }};
+
+  test('a 429 is retried after each delay and the call then succeeds', async () => {
+    waits.length = 0;
+    const fetchStub = withStatuses(429, 503, 200);
+    try {
+      const result = await callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options);
+      assert.ok(result.audioBuffer.length > 0);
+    } finally { fetchStub.restore(); }
+    assert.equal(fetchStub.calls.length, 3);
+    assert.deepEqual(waits, [5, 10]);
   });
 
-  test('HEBREW_STABILITY constant is 0', () => {
-    assert.equal(HEBREW_STABILITY, 0);
+  test('after the last delay the error is reported with its status', async () => {
+    waits.length = 0;
+    const fetchStub = withStatuses(500);
+    try {
+      await assert.rejects(
+        () => callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options),
+        /ElevenLabs 500/,
+      );
+    } finally { fetchStub.restore(); }
+    assert.equal(fetchStub.calls.length, 4);
+    assert.deepEqual(waits, [5, 10, 20]);
+  });
+
+  test('an error a retry cannot fix is reported at once', async () => {
+    waits.length = 0;
+    const fetchStub = withStatuses(401);
+    try {
+      await assert.rejects(
+        () => callTtsWithTimestamps('ט', 'voice', 'eleven_v4', 'fake-key', 'en', {}, options),
+        /ElevenLabs 401/,
+      );
+    } finally { fetchStub.restore(); }
+    assert.equal(fetchStub.calls.length, 1);
+    assert.deepEqual(waits, []);
   });
 });

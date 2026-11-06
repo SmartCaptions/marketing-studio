@@ -15,21 +15,13 @@ import {spawnSync} from 'node:child_process';
 // ─────────────────────────────────────────────────────────────────────────────
 export const ELEVENLABS_API = 'https://api.elevenlabs.io';
 export const TTS_TIMEOUT = 90_000;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Model to use per language. All languages use eleven_v4 (the current latest). */
 export const MODEL_FOR_LANG = {he: 'eleven_v4', en: 'eleven_v4', ar: 'eleven_v4'};
 
-/**
- * Hebrew voice F settings (owner pick, 2026-09-25) — kept as module defaults.
- * These are overridden by the brand JSON `ttsSettings.he` block when present;
- * the brand JSON block is the source of truth so the owner can tune without code changes.
- *   - stability 0 for a lighter, more expressive delivery
- *   - [cheerfully] prefix tag for the required tone
- *   - 1.05× time-stretch post-TTS (atempo=1.05 => 1/1.05 of original length)
- */
-export const HEBREW_TAG = '[cheerfully] ';
-export const HEBREW_STABILITY = 0;
-export const HEBREW_TEMPO = 1.05;
+/** Retries after an ElevenLabs 429 or 5xx: three more attempts, backing off 1 s, 2 s, 4 s. */
+export const TTS_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // .env reader
@@ -99,14 +91,6 @@ export const getVoiceId = (brandJson, language) => {
  */
 export const getLangSettings = (brandJson, language) => {
   const stored = brandJson.ttsSettings?.[language] ?? {};
-  if (language === 'he') {
-    return {
-      tag: stored.tag !== undefined ? stored.tag : HEBREW_TAG,
-      stability: stored.stability !== undefined ? stored.stability : HEBREW_STABILITY,
-      tempo: stored.tempo !== undefined ? stored.tempo : HEBREW_TEMPO,
-    };
-  }
-  // English and Arabic: no defaults — settings block optional
   return {
     tag: stored.tag ?? null,
     stability: stored.stability ?? null,
@@ -121,7 +105,7 @@ export const getLangSettings = (brandJson, language) => {
 /**
  * Strip a leading prose-style tag (`[…] `) from character-level alignment arrays.
  * Called after a Hebrew TTS response to remove the `[cheerfully] ` prefix characters
- * that eleven_v3 returns in its alignment.
+ * that the model returns in its alignment.
  *
  * Returns the trimmed arrays with tag characters removed. When no tag is present the
  * original arrays are returned unchanged.
@@ -194,8 +178,8 @@ export const stretchAudio = (audioBuffer, tempo) => {
  *   - `stability`: optional voice_settings.stability override.
  *   - `tempo`:     optional post-TTS atempo stretch (> 1 speeds up / shortens).
  *
- * Hebrew defaults: tag='[cheerfully] ', stability=0, tempo=1.05.
- * English/Arabic defaults: no tag, no stability override, no stretch.
+ * Without settings there is no tag, no stability override and no stretch; the brand JSON
+ * (`ttsSettings.<language>`) is the only place a language's delivery is tuned.
  *
  * @param {string} text
  * @param {string} voiceId
@@ -203,6 +187,8 @@ export const stretchAudio = (audioBuffer, tempo) => {
  * @param {string} apiKey
  * @param {'he'|'en'|'ar'} [language='en']
  * @param {{tag?: string|null, stability?: number|null, tempo?: number|null}} [langSettings]
+ * @param {{retryDelaysMs?: number[], sleep?: (ms: number) => Promise<void>}} [options]
+ *   Waits before each retry of a 429 or 5xx (default TTS_RETRY_DELAYS_MS), and how to wait.
  * @returns {Promise<{audioBuffer: Buffer, alignment: object, durationMs: number}>}
  */
 export const callTtsWithTimestamps = async (
@@ -212,6 +198,7 @@ export const callTtsWithTimestamps = async (
   apiKey,
   language = 'en',
   langSettings = {},
+  {retryDelaysMs = TTS_RETRY_DELAYS_MS, sleep: wait = sleep} = {},
 ) => {
   const {tag = null, stability = null, tempo = null} = langSettings;
 
@@ -226,15 +213,21 @@ export const callTtsWithTimestamps = async (
   }
 
   const url = `${ELEVENLABS_API}/v1/text-to-speech/${voiceId}/with-timestamps`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TTS_TIMEOUT),
-  });
+  let res;
+  for (let attempt = 0; ; attempt++) {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TTS_TIMEOUT),
+    });
+    const retryable = res.status === 429 || res.status >= 500;
+    if (res.ok || !retryable || attempt >= retryDelaysMs.length) break;
+    await wait(retryDelaysMs[attempt]);
+  }
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
