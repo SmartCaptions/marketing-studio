@@ -174,7 +174,7 @@ placeholder so smoke stays green on a clean clone.
 ### Audio (ElevenLabs feeder)
 - Verified endpoints (Context7, do not re-derive): TTS
   `POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128`
-  with body `{"text", "model_id": "eleven_multilingual_v2"}`; Music
+  with body `{"text", "model_id": "eleven_v4"}`; Music
   `POST https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128` with body
   `{"prompt", "music_length_ms", "model_id": "music_v2"}`. Both take header
   `xi-api-key`, return binary mp3. `music_length_ms` covers the 3s-120s range we need.
@@ -204,10 +204,19 @@ placeholder so smoke stays green on a clean clone.
   voice under 12 dB above a hot track. Effects under speech take the music's duck
   (`audioMix.ts` `voiceDuck`). Rendered posts end with a limiter after loudnorm: intro hits
   otherwise peaked at -0.6 dBTP.
-- Hebrew TTS (`scripts/lib/tts.mjs`): `eleven_v3` ignores `voice_settings.speed`, so the lighter,
-  quicker read the owner chose is stability 0 plus a `[cheerfully] ` tag, then `atempo=1.15`
-  with the character timings divided by 1.15. The with-timestamps alignment returns the tag as
-  characters; they are dropped before words are built.
+- TTS model: all languages use `eleven_v4` (set in `scripts/lib/tts.mjs` `MODEL_FOR_LANG`).
+  `feeders/audio/client.mjs` uses the same model for the `vo` command.
+- Supported languages: `he` (Hebrew), `en` (English), `ar` (Modern Standard Arabic).
+  Voices are configured per-brand in `brands/<id>.json` under `voices.{he,en,ar}`.
+  Per-language TTS settings (tag, stability, tempo) live under `ttsSettings.<lang>` in
+  the same file. Hebrew defaults: `[cheerfully]` tag, stability 0, tempo 1.15×.
+  Arabic uses `Noto Sans Arabic` (loaded via `@remotion/google-fonts`) for RTL rendering.
+- Hebrew TTS (`scripts/lib/tts.mjs`): the lighter quicker read is stability 0 plus a
+  `[cheerfully] ` tag, then `atempo=1.15` with the character timings divided by 1.15.
+  The with-timestamps alignment returns the tag as characters; they are dropped before
+  words are built. These values are now read from `ttsSettings.he` in the brand JSON.
+- Thumbnail: `node scripts/render-thumbnail.mjs --title "<text>" --language he|en|ar --out <abs.png>`
+  renders a 1280×720 PNG via the `Thumbnail` Remotion composition. RTL layout for he/ar.
 - Fallback behavior is part of the contract, not an error state: missing
   `ELEVENLABS_API_KEY` makes the feeder exit 2 with guidance and the video renders
   silent — that silent render is still a valid deliverable on a clean clone.
