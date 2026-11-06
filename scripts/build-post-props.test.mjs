@@ -10,6 +10,7 @@ import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import {alignmentToWords, groupToPhrases} from './lib/tts.mjs';
+import {withFakeTools} from './lib/fake-tools.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 
@@ -239,5 +240,146 @@ describe('stageMedia', () => {
     assert.deepEqual([info.streams[0].codec_name, info.streams[0].width, info.streams[0].height], ['h264', 580, 860]);
     assert.ok(Math.abs(Number(info.format.duration) - 2.5) < 0.2, `duration ${info.format.duration}`);
     rmSync(dir, {recursive: true, force: true});
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The BrAInd contract: which voice speaks, and what result.json reports about it
+// (expectations from the README: job `voice_id`, `voices.<language>`, `ttsSettings.<language>`,
+// `eleven_v4` for every line, result.json `voice_id` / `model` / `narration` [{text, audio}])
+// ─────────────────────────────────────────────────────────────────────────────
+describe('HybridPost voice contract (stubbed network)', () => {
+  const brand = JSON.parse(readFileSync(join(ROOT, 'brands', 'smartcaptions.json'), 'utf8'));
+  const stubMp3 = Buffer.alloc(32, 0xff);
+  const stubFetch = async (url) => {
+    if (url.includes('/with-timestamps')) {
+      return {
+        ok: true,
+        json: async () => ({
+          audio_base64: stubMp3.toString('base64'),
+          alignment: {
+            characters: ['H', 'i', '!'],
+            character_start_times_seconds: [0.0, 0.3, 0.6],
+            character_end_times_seconds: [0.3, 0.6, 0.9],
+          },
+        }),
+      };
+    }
+    return {ok: false, text: async () => 'unexpected url', status: 500};
+  };
+  const ttsPath = (voiceId) => `/v1/text-to-speech/${voiceId}/with-timestamps`;
+
+  let jobCount = 0;
+  const setupJob = (language, narrations, jobExtra = {}) => {
+    const tmpBase = join(tmpdir(), `post-contract-${Date.now()}-${jobCount++}`);
+    const outputDir = join(tmpBase, 'output');
+    mkdirSync(outputDir, {recursive: true});
+    const id = `test-post-contract-${jobCount}`;
+    const job = {
+      schema_version: 1,
+      id,
+      language,
+      look: 'studio',
+      ai_disclosure: false,
+      output_dir: outputDir,
+      attribution: null,
+      shots: [
+        {kind: 'title', narration: narrations[0], heading: 'x'},
+        {kind: 'end', narration: narrations[1]},
+      ],
+      ...jobExtra,
+    };
+    const jobPath = join(tmpBase, 'job.json');
+    writeFileSync(jobPath, JSON.stringify(job));
+    // render-post stages under studio/public/posts/<id>--<output dir name>
+    const publicDir = join(ROOT, 'studio', 'public', 'posts', `${id}--output`);
+    return {jobPath, outputDir, tmpBase, publicDir};
+  };
+
+  /** Run buildPostProps against a fetch that records each TTS request. */
+  const buildRecording = async (jobPath, publicRoot) => {
+    const calls = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      calls.push({url, body: JSON.parse(opts.body)});
+      return stubFetch(url, opts);
+    };
+    try {
+      const {buildPostProps} = await import('./build-post-props.mjs');
+      // The music feeder is spawned as `node feeders/audio/client.mjs`; the fake tools keep it off the network
+      const built = await withFakeTools(() => buildPostProps({jobPath, apiKeyOverride: 'stub-key', publicRoot}));
+      return {...built, calls};
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  };
+
+  it('speaks every shot with the job voice_id', async () => {
+    const {jobPath, tmpBase} = setupJob('en', ['First line', 'Second line'], {voice_id: 'job-chosen-voice'});
+    try {
+      const {calls, voiceId} = await buildRecording(jobPath, join(tmpBase, 'public'));
+      assert.equal(calls.length, 2);
+      for (const c of calls) assert.ok(c.url.endsWith(ttsPath('job-chosen-voice')), c.url);
+      assert.equal(voiceId, 'job-chosen-voice');
+    } finally {
+      rmSync(tmpBase, {recursive: true, force: true});
+    }
+  });
+
+  it('speaks with the brand voice for the language when the job has no voice_id', async () => {
+    const {jobPath, tmpBase} = setupJob('en', ['First line', 'Second line']);
+    try {
+      const {calls, voiceId} = await buildRecording(jobPath, join(tmpBase, 'public'));
+      assert.ok(calls[0].url.endsWith(ttsPath(brand.voices.en)), calls[0].url);
+      assert.equal(voiceId, brand.voices.en);
+    } finally {
+      rmSync(tmpBase, {recursive: true, force: true});
+    }
+  });
+
+  it('accepts language "ar" and asks for the Arabic voice on eleven_v4 with the Arabic delivery', async () => {
+    const narrations = ['مرحبا بالعالم', 'هذا هو الناتج'];
+    const {jobPath, tmpBase} = setupJob('ar', narrations);
+    try {
+      const {props, calls, modelId} = await buildRecording(jobPath, join(tmpBase, 'public'));
+      assert.equal(props.language, 'ar');
+      assert.equal(modelId, 'eleven_v4');
+      assert.equal(calls.length, 2);
+      // ttsSettings.<language> is the only place a language's delivery is set; Arabic's block is optional
+      const delivery = brand.ttsSettings?.ar ?? {};
+      calls.forEach((c, i) => {
+        assert.ok(c.url.endsWith(ttsPath(brand.voices.ar)), c.url);
+        assert.equal(c.body.model_id, 'eleven_v4');
+        assert.equal(c.body.text, `${delivery.tag ?? ''}${narrations[i]}`);
+        assert.deepEqual(c.body.voice_settings, delivery.stability === undefined ? undefined : {stability: delivery.stability});
+      });
+    } finally {
+      rmSync(tmpBase, {recursive: true, force: true});
+    }
+  });
+
+  it('result.json reports the voice_id, model and narration [{text, audio}] of the voice-over', async () => {
+    const narrations = ['مرحبا بالعالم', 'هذا هو الناتج'];
+    const {jobPath, outputDir, tmpBase, publicDir} = setupJob('ar', narrations, {voice_id: 'job-chosen-voice'});
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = stubFetch;
+    try {
+      const {main} = await import('./render-post.mjs');
+      await withFakeTools(() => main(['--job', jobPath], {apiKeyOverride: 'stub-key'}));
+
+      const result = JSON.parse(readFileSync(join(outputDir, 'result.json'), 'utf8'));
+      assert.equal(result.status, 'done');
+      assert.equal(result.voice_id, 'job-chosen-voice');
+      assert.equal(result.model, 'eleven_v4');
+      assert.deepEqual(result.narration.map((n) => n.text), narrations);
+      for (const n of result.narration) {
+        assert.deepEqual(Object.keys(n).sort(), ['audio', 'text']);
+        assert.deepEqual(readFileSync(n.audio), stubMp3, `no voice-over file at ${n.audio}`);
+      }
+    } finally {
+      globalThis.fetch = origFetch;
+      rmSync(tmpBase, {recursive: true, force: true});
+      rmSync(publicDir, {recursive: true, force: true});
+    }
   });
 });

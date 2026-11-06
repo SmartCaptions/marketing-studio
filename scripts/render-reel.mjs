@@ -103,8 +103,7 @@ const buildSrt = (props) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
-const main = async () => {
-  const args = process.argv.slice(2);
+export const main = async (args = process.argv.slice(2), {apiKeyOverride} = {}) => {
   const jobIdx = args.indexOf('--job');
   const jobPath = jobIdx >= 0 ? args[jobIdx + 1] : null;
 
@@ -137,7 +136,7 @@ const main = async () => {
   let propsPath, props, voiceId, modelId, narration;
   try {
     console.log('[render-reel] building props…');
-    ({propsPath, props, voiceId, modelId, narration} = await buildReelProps({jobPath: jobAbs}));
+    ({propsPath, props, voiceId, modelId, narration} = await buildReelProps({jobPath: jobAbs, apiKeyOverride}));
   } catch (err) {
     const msg = err.message ?? String(err);
     console.error(`[render-reel] props build failed: ${msg}`);
@@ -260,7 +259,9 @@ const main = async () => {
   console.log(`[render-reel] done → ${resultPath}`);
 };
 
-main().catch((err) => {
-  console.error('[render-reel] unexpected error:', err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('[render-reel] unexpected error:', err);
+    process.exit(1);
+  });
+}
