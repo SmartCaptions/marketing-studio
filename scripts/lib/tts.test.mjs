@@ -6,10 +6,63 @@ import {
   HEBREW_STABILITY,
   HEBREW_TEMPO,
   MODEL_FOR_LANG,
+  getLangSettings,
   stripLeadingTag,
   stretchAudio,
   callTtsWithTimestamps,
 } from './tts.mjs';
+
+// ─── MODEL_FOR_LANG ──────────────────────────────────────────────────────────
+
+describe('MODEL_FOR_LANG', () => {
+  test('he, en and ar all use eleven_v4', () => {
+    assert.equal(MODEL_FOR_LANG.he, 'eleven_v4');
+    assert.equal(MODEL_FOR_LANG.en, 'eleven_v4');
+    assert.equal(MODEL_FOR_LANG.ar, 'eleven_v4');
+  });
+});
+
+// ─── getLangSettings ─────────────────────────────────────────────────────────
+
+describe('getLangSettings', () => {
+  test('Hebrew falls back to built-in defaults when ttsSettings absent', () => {
+    const brand = {voices: {he: 'v1'}};
+    const s = getLangSettings(brand, 'he');
+    assert.equal(s.tag, HEBREW_TAG);
+    assert.equal(s.stability, HEBREW_STABILITY);
+    assert.equal(s.tempo, HEBREW_TEMPO);
+  });
+
+  test('Hebrew reads overrides from brand JSON', () => {
+    const brand = {voices: {he: 'v1'}, ttsSettings: {he: {tag: '[happy] ', stability: 0.3, tempo: 1.0}}};
+    const s = getLangSettings(brand, 'he');
+    assert.equal(s.tag, '[happy] ');
+    assert.equal(s.stability, 0.3);
+    assert.equal(s.tempo, 1.0);
+  });
+
+  test('Hebrew stability=0 reads correctly (not treated as falsy)', () => {
+    const brand = {voices: {he: 'v1'}, ttsSettings: {he: {stability: 0}}};
+    const s = getLangSettings(brand, 'he');
+    assert.equal(s.stability, 0);
+  });
+
+  test('English returns null settings when ttsSettings absent', () => {
+    const brand = {voices: {en: 'v2'}};
+    const s = getLangSettings(brand, 'en');
+    assert.equal(s.tag, null);
+    assert.equal(s.stability, null);
+    assert.equal(s.tempo, null);
+  });
+
+  test('Arabic returns null settings when ttsSettings absent', () => {
+    const brand = {voices: {ar: 'v3'}};
+    const s = getLangSettings(brand, 'ar');
+    assert.equal(s.tag, null);
+    assert.equal(s.stability, null);
+    assert.equal(s.tempo, null);
+  });
+});
 
 // ─── stripLeadingTag ────────────────────────────────────────────────────────
 
@@ -68,124 +121,94 @@ describe('stretchAudio', () => {
   });
 });
 
-// ─── callTtsWithTimestamps: Hebrew request shape ────────────────────────────
+// ─── callTtsWithTimestamps: request shape per language ────────────────────────
 
-describe('callTtsWithTimestamps Hebrew request', () => {
-  test('sends stability 0 and [cheerfully] prefix for Hebrew', async () => {
+describe('callTtsWithTimestamps', () => {
+  // Helper: minimal fake alignment for a text string.
+  const fakeAlignFor = (text) => ({
+    characters: text.split(''),
+    character_start_times_seconds: text.split('').map((_, i) => i * 0.05),
+    character_end_times_seconds: text.split('').map((_, i) => i * 0.05 + 0.04),
+  });
+
+  const patchFetch = (body) => {
+    const origFetch = globalThis.fetch;
     let captured;
-    // Minimal alignment with one real character to pass alignment stripping.
-    const fakeAlignment = {
-      characters: '[cheerfully] ט'.split(''),
-      character_start_times_seconds: '[cheerfully] ט'.split('').map((_, i) => i * 0.05),
-      character_end_times_seconds: '[cheerfully] ט'.split('').map((_, i) => i * 0.05 + 0.04),
-    };
-    const fakeAudio = Buffer.alloc(100);
-    const fakeFetch = async (url, opts) => {
+    globalThis.fetch = async (url, opts) => {
       captured = {url, body: JSON.parse(opts.body)};
       return {
         ok: true,
-        json: async () => ({
-          audio_base64: fakeAudio.toString('base64'),
-          alignment: fakeAlignment,
-        }),
+        json: async () => ({audio_base64: Buffer.alloc(100).toString('base64'), alignment: body}),
       };
     };
-
-    // Patch global fetch for this test
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = fakeFetch;
-    try {
-      await callTtsWithTimestamps('טוב', 'voice-he', 'eleven_v3', 'fake-key', 'he');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-
-    assert.ok(captured, 'fetch was called');
-    assert.ok(captured.url.endsWith('/with-timestamps'), 'calls with-timestamps endpoint');
-    assert.equal(captured.body.text, `${HEBREW_TAG}טוב`);
-    assert.equal(captured.body.model_id, 'eleven_v3');
-    assert.deepEqual(captured.body.voice_settings, {stability: HEBREW_STABILITY});
-  });
-
-  test('sends no voice_settings and no prefix for English', async () => {
-    let captured;
-    const fakeAlignment = {
-      characters: 'hi'.split(''),
-      character_start_times_seconds: [0, 0.1],
-      character_end_times_seconds: [0.09, 0.19],
+    return {
+      restore: () => { globalThis.fetch = origFetch; },
+      get captured() { return captured; },
     };
-    const fakeFetch = async (url, opts) => {
-      captured = {body: JSON.parse(opts.body)};
-      return {
-        ok: true,
-        json: async () => ({
-          audio_base64: Buffer.alloc(100).toString('base64'),
-          alignment: fakeAlignment,
-        }),
-      };
-    };
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = fakeFetch;
+  };
+
+  test('Hebrew: sends stability 0 and [cheerfully] prefix via langSettings', async () => {
+    const patch = patchFetch(fakeAlignFor('[cheerfully] ט'));
     try {
-      await callTtsWithTimestamps('hi', 'voice-en', 'eleven_multilingual_v2', 'fake-key', 'en');
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-    assert.equal(captured.body.text, 'hi', 'no prefix added for English');
-    assert.equal(captured.body.voice_settings, undefined, 'no voice_settings for English');
+      await callTtsWithTimestamps('טוב', 'voice-he', 'eleven_v4', 'fake-key', 'he',
+        {tag: HEBREW_TAG, stability: HEBREW_STABILITY, tempo: HEBREW_TEMPO});
+    } finally { patch.restore(); }
+    assert.ok(patch.captured.url.endsWith('/with-timestamps'));
+    assert.equal(patch.captured.body.text, `${HEBREW_TAG}טוב`);
+    assert.equal(patch.captured.body.model_id, 'eleven_v4');
+    assert.deepEqual(patch.captured.body.voice_settings, {stability: 0});
   });
 
-  test('MODEL_FOR_LANG maps he to eleven_v3 and en to multilingual', () => {
-    assert.equal(MODEL_FOR_LANG.he, 'eleven_v3');
-    assert.match(MODEL_FOR_LANG.en, /multilingual/);
+  test('English: no prefix, no voice_settings, eleven_v4', async () => {
+    const patch = patchFetch(fakeAlignFor('hi'));
+    try {
+      await callTtsWithTimestamps('hi', 'voice-en', 'eleven_v4', 'fake-key', 'en', {tag: null, stability: null, tempo: null});
+    } finally { patch.restore(); }
+    assert.equal(patch.captured.body.text, 'hi');
+    assert.equal(patch.captured.body.model_id, 'eleven_v4');
+    assert.equal(patch.captured.body.voice_settings, undefined);
   });
 
-  test('Hebrew TEMPO constant is 1.15', () => {
-    assert.equal(HEBREW_TEMPO, 1.15);
+  test('Arabic: no prefix, no voice_settings, eleven_v4', async () => {
+    const patch = patchFetch(fakeAlignFor('مرحبا'));
+    try {
+      await callTtsWithTimestamps('مرحبا', 'voice-ar', 'eleven_v4', 'fake-key', 'ar', {tag: null, stability: null, tempo: null});
+    } finally { patch.restore(); }
+    assert.equal(patch.captured.body.text, 'مرحبا');
+    assert.equal(patch.captured.body.model_id, 'eleven_v4');
+    assert.equal(patch.captured.body.voice_settings, undefined);
   });
 
-  test('Hebrew STABILITY constant is 0', () => {
-    assert.equal(HEBREW_STABILITY, 0);
-  });
-
-  test('Hebrew timestamps are divided by HEBREW_TEMPO', async () => {
-    const rawStart = 0.115; // after tag strip, first real char
+  test('Hebrew timestamps are divided by tempo after tag strip', async () => {
     const tagPlusSpace = '[cheerfully] '.split('');
     const realChar = 'ט';
     const allChars = [...tagPlusSpace, realChar];
     const allStarts = allChars.map((_, i) => i * 0.1);
     const allEnds = allChars.map((_, i) => i * 0.1 + 0.09);
-    const fakeAlignment = {
+    const patch = patchFetch({
       characters: allChars,
       character_start_times_seconds: allStarts,
       character_end_times_seconds: allEnds,
-    };
-
+    });
     let resultAlignment;
-    const fakeFetch = async (_url, opts) => {
-      return {
-        ok: true,
-        json: async () => ({
-          audio_base64: Buffer.alloc(100).toString('base64'),
-          alignment: fakeAlignment,
-        }),
-      };
-    };
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = fakeFetch;
     try {
-      const result = await callTtsWithTimestamps('ט', 'voice-he', 'eleven_v3', 'fake-key', 'he');
+      const result = await callTtsWithTimestamps('ט', 'voice-he', 'eleven_v4', 'fake-key', 'he',
+        {tag: HEBREW_TAG, stability: HEBREW_STABILITY, tempo: HEBREW_TEMPO});
       resultAlignment = result.alignment;
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-    // After tag strip (13 chars stripped), only 'ט' remains.
+    } finally { patch.restore(); }
     assert.equal(resultAlignment.characters.length, 1);
-    // Timestamps should be divided by HEBREW_TEMPO
     const expectedStart = allStarts[tagPlusSpace.length] / HEBREW_TEMPO;
     assert.ok(
       Math.abs(resultAlignment.character_start_times_seconds[0] - expectedStart) < 0.001,
       `start ${resultAlignment.character_start_times_seconds[0]} ≈ ${expectedStart}`,
     );
+  });
+
+  test('HEBREW_TEMPO constant is 1.15', () => {
+    assert.equal(HEBREW_TEMPO, 1.15);
+  });
+
+  test('HEBREW_STABILITY constant is 0', () => {
+    assert.equal(HEBREW_STABILITY, 0);
   });
 });

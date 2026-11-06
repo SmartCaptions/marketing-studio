@@ -142,7 +142,7 @@ const main = async () => {
       for (const line of script.lines) {
         const bytes = await generate(
           buildTtsUrl(voice),
-          {text: line.text, model_id: 'eleven_multilingual_v2'},
+          {text: line.text, model_id: 'eleven_v4'},
           key,
           TTS_TIMEOUT,
         );

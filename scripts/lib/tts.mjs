@@ -16,11 +16,13 @@ import {spawnSync} from 'node:child_process';
 export const ELEVENLABS_API = 'https://api.elevenlabs.io';
 export const TTS_TIMEOUT = 90_000;
 
-/** Model to use per language (verified 2026-09). */
-export const MODEL_FOR_LANG = {he: 'eleven_v3', en: 'eleven_multilingual_v2'};
+/** Model to use per language. All languages use eleven_v4 (the current latest). */
+export const MODEL_FOR_LANG = {he: 'eleven_v4', en: 'eleven_v4', ar: 'eleven_v4'};
 
 /**
- * Hebrew voice F settings (owner pick, 2026-09-25):
+ * Hebrew voice F settings (owner pick, 2026-09-25) — kept as module defaults.
+ * These are overridden by the brand JSON `ttsSettings.he` block when present;
+ * the brand JSON block is the source of truth so the owner can tune without code changes.
  *   - stability 0 for a lighter, more expressive delivery
  *   - [cheerfully] prefix tag for the required tone
  *   - 1.15× time-stretch post-TTS (atempo=1.15 => 1/1.15 of original length)
@@ -62,21 +64,54 @@ export const readEnv = (root) => {
  * Throws a clear error when the voices block is missing or the language is absent.
  *
  * @param {object} brandJson - parsed brand JSON (brands/<id>.json)
- * @param {'he'|'en'} language
+ * @param {'he'|'en'|'ar'} language
  * @returns {string} voice ID
  */
 export const getVoiceId = (brandJson, language) => {
   const voices = brandJson.voices;
   if (!voices)
     throw new Error(
-      `Brand JSON is missing a "voices" block. Add { "voices": { "he": "<voice-id>", "en": "<voice-id>" } }.`,
+      `Brand JSON is missing a "voices" block. Add { "voices": { "he": "<voice-id>", "en": "<voice-id>", "ar": "<voice-id>" } }.`,
     );
   const id = voices[language];
   if (!id)
     throw new Error(
-      `Brand JSON voices block has no entry for language "${language}". Add it.`,
+      `Brand JSON voices block has no entry for language "${language}". Add it to brands/smartcaptions.json.`,
     );
   return id;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-language TTS settings
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Return per-language TTS settings from the brand JSON `ttsSettings` block.
+ * Falls back to built-in defaults so existing Hebrew behaviour is unchanged.
+ *
+ * Shape per language:
+ *   { tag?: string, stability?: number, tempo?: number }
+ *
+ * Only Hebrew has defaults; English and Arabic carry no defaults (plain call).
+ *
+ * @param {object} brandJson
+ * @param {'he'|'en'|'ar'} language
+ * @returns {{ tag: string|null, stability: number|null, tempo: number|null }}
+ */
+export const getLangSettings = (brandJson, language) => {
+  const stored = brandJson.ttsSettings?.[language] ?? {};
+  if (language === 'he') {
+    return {
+      tag: stored.tag !== undefined ? stored.tag : HEBREW_TAG,
+      stability: stored.stability !== undefined ? stored.stability : HEBREW_STABILITY,
+      tempo: stored.tempo !== undefined ? stored.tempo : HEBREW_TEMPO,
+    };
+  }
+  // English and Arabic: no defaults — settings block optional
+  return {
+    tag: stored.tag ?? null,
+    stability: stored.stability ?? null,
+    tempo: stored.tempo ?? null,
+  };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,34 +188,41 @@ export const stretchAudio = (audioBuffer, tempo) => {
  * Call ElevenLabs /v1/text-to-speech/{voice}/with-timestamps and return the
  * audio buffer, word-level alignment data, and computed duration in ms.
  *
- * For Hebrew (`language === 'he'`):
- *   - prefixes text with HEBREW_TAG so ElevenLabs delivers a lighter tone;
- *   - sets voice_settings.stability to HEBREW_STABILITY;
- *   - strips the tag characters from the returned alignment;
- *   - stretches the audio to 1/HEBREW_TEMPO of its original length with ffmpeg;
- *   - divides all character timestamps by HEBREW_TEMPO so captions track the
- *     faster speech exactly.
+ * Per-language behaviour is driven by `langSettings` (from getLangSettings):
+ *   - `tag`:       optional prefix added to the text before the API call; its
+ *                  characters are stripped from the returned alignment.
+ *   - `stability`: optional voice_settings.stability override.
+ *   - `tempo`:     optional post-TTS atempo stretch (> 1 speeds up / shortens).
  *
- * English requests are byte-identical to the pre-Hebrew version.
+ * Hebrew defaults: tag='[cheerfully] ', stability=0, tempo=1.15.
+ * English/Arabic defaults: no tag, no stability override, no stretch.
  *
  * @param {string} text
  * @param {string} voiceId
  * @param {string} modelId
  * @param {string} apiKey
- * @param {'he'|'en'} [language='en']
+ * @param {'he'|'en'|'ar'} [language='en']
+ * @param {{tag?: string|null, stability?: number|null, tempo?: number|null}} [langSettings]
  * @returns {Promise<{audioBuffer: Buffer, alignment: object, durationMs: number}>}
  */
-export const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey, language = 'en') => {
-  const isHebrew = language === 'he';
+export const callTtsWithTimestamps = async (
+  text,
+  voiceId,
+  modelId,
+  apiKey,
+  language = 'en',
+  langSettings = {},
+) => {
+  const {tag = null, stability = null, tempo = null} = langSettings;
 
-  const requestText = isHebrew ? `${HEBREW_TAG}${text}` : text;
+  const requestText = tag ? `${tag}${text}` : text;
   const body = {
     text: requestText,
     model_id: modelId,
     output_format: 'mp3_44100_128',
   };
-  if (isHebrew) {
-    body.voice_settings = {stability: HEBREW_STABILITY};
+  if (stability !== null) {
+    body.voice_settings = {stability};
   }
 
   const url = `${ELEVENLABS_API}/v1/text-to-speech/${voiceId}/with-timestamps`;
@@ -195,8 +237,8 @@ export const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey, lang
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`ElevenLabs ${res.status}: ${body.slice(0, 300)}`);
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`ElevenLabs ${res.status}: ${errBody.slice(0, 300)}`);
   }
 
   const json = await res.json();
@@ -204,21 +246,38 @@ export const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey, lang
   let audioBuffer = Buffer.from(json.audio_base64, 'base64');
   let alignment = json.alignment; // {characters, character_start_times_seconds, character_end_times_seconds}
 
-  if (isHebrew && alignment) {
-    // Strip the [cheerfully] tag characters returned by ElevenLabs from the alignment.
+  if (tag && alignment) {
+    // Strip the tag characters returned by ElevenLabs from the alignment.
     const stripped = stripLeadingTag(
       alignment.characters ?? [],
       alignment.character_start_times_seconds ?? [],
       alignment.character_end_times_seconds ?? [],
     );
-    // Divide all timestamps by HEBREW_TEMPO to match the stretched (faster) audio.
+    if (tempo !== null) {
+      // Divide all timestamps by tempo to match the stretched (faster) audio.
+      alignment = {
+        characters: stripped.characters,
+        character_start_times_seconds: stripped.startSecs.map((t) => t / tempo),
+        character_end_times_seconds: stripped.endSecs.map((t) => t / tempo),
+      };
+    } else {
+      alignment = {
+        characters: stripped.characters,
+        character_start_times_seconds: stripped.startSecs,
+        character_end_times_seconds: stripped.endSecs,
+      };
+    }
+  } else if (tempo !== null && alignment) {
+    // tempo without tag: just scale the timestamps
     alignment = {
-      characters: stripped.characters,
-      character_start_times_seconds: stripped.startSecs.map((t) => t / HEBREW_TEMPO),
-      character_end_times_seconds: stripped.endSecs.map((t) => t / HEBREW_TEMPO),
+      characters: alignment.characters,
+      character_start_times_seconds: (alignment.character_start_times_seconds ?? []).map((t) => t / tempo),
+      character_end_times_seconds: (alignment.character_end_times_seconds ?? []).map((t) => t / tempo),
     };
-    // Stretch the audio to 1/HEBREW_TEMPO of its length (faster, lighter delivery).
-    audioBuffer = stretchAudio(audioBuffer, HEBREW_TEMPO);
+  }
+
+  if (tempo !== null) {
+    audioBuffer = stretchAudio(audioBuffer, tempo);
   }
 
   // Measure duration from the last end time in the (possibly stripped/scaled) alignment.
