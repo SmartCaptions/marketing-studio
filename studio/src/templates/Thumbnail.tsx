@@ -4,8 +4,8 @@
  * Usage: node scripts/render-thumbnail.mjs --title "<title>" --language he|en|ar --out <abs.png>
  *
  * Layout:
- *   - Deep navy background (#0f172a)
- *   - SmartCaptions brand blue (#1667ff) top bar
+ *   - Dark brand background
+ *   - Brand-blue top bar
  *   - Title in brand display font, RTL for he/ar
  *   - Brand wordmark bottom-right
  *   - Orange accent stripe
@@ -70,8 +70,8 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({brandId, title, language}) 
         style={{
           position: 'absolute',
           top: '50%',
-          left: rtl ? 60 : 60,
-          right: rtl ? 60 : 60,
+          left: 60,
+          right: 60,
           transform: 'translateY(-55%)',
           direction: dir,
           textAlign: rtl ? 'right' : 'left',
@@ -116,7 +116,7 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({brandId, title, language}) 
             letterSpacing: '0.04em',
           }}
         >
-          SmartCaptions
+          {brand.name}
         </span>
         <span
           style={{
@@ -127,7 +127,7 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({brandId, title, language}) 
             letterSpacing: '0.03em',
           }}
         >
-          smartcaptions.co.il
+          {brand.url}
         </span>
       </div>
 

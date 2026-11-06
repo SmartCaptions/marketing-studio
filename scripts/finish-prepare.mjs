@@ -83,7 +83,9 @@ export const prepareFinish = async ({jobPath, workDir}) => {
   mkdirSync(publicRoot, {recursive: true});
   mkdirSync(join(workDir, 'src'), {recursive: true});
 
-  const {props: post} = await buildPostProps({jobPath, outDirOverride: workDir, publicRoot});
+  const {props: post, narration} = await buildPostProps({jobPath, outDirOverride: workDir, publicRoot});
+  // What was spoken, line by line: BrAInd reads it to check a voice-over nobody reads (Arabic).
+  writeFileSync(join(workDir, 'narration.json'), JSON.stringify(narration, null, 2));
 
   const media = {};
   const shots = post.shots.map((shot, i) => {

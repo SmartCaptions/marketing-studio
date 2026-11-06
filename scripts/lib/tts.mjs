@@ -78,12 +78,10 @@ export const getVoiceId = (brandJson, language) => {
 // ─────────────────────────────────────────────────────────────────────────────
 /**
  * Return per-language TTS settings from the brand JSON `ttsSettings` block.
- * Falls back to built-in defaults so existing Hebrew behaviour is unchanged.
+ * A language with no block gets a plain call: no tag, no stability override, no stretch.
  *
  * Shape per language:
  *   { tag?: string, stability?: number, tempo?: number }
- *
- * Only Hebrew has defaults; English and Arabic carry no defaults (plain call).
  *
  * @param {object} brandJson
  * @param {'he'|'en'|'ar'} language
@@ -239,33 +237,24 @@ export const callTtsWithTimestamps = async (
   let audioBuffer = Buffer.from(json.audio_base64, 'base64');
   let alignment = json.alignment; // {characters, character_start_times_seconds, character_end_times_seconds}
 
-  if (tag && alignment) {
-    // Strip the tag characters returned by ElevenLabs from the alignment.
-    const stripped = stripLeadingTag(
-      alignment.characters ?? [],
-      alignment.character_start_times_seconds ?? [],
-      alignment.character_end_times_seconds ?? [],
-    );
-    if (tempo !== null) {
-      // Divide all timestamps by tempo to match the stretched (faster) audio.
-      alignment = {
-        characters: stripped.characters,
-        character_start_times_seconds: stripped.startSecs.map((t) => t / tempo),
-        character_end_times_seconds: stripped.endSecs.map((t) => t / tempo),
-      };
-    } else {
-      alignment = {
-        characters: stripped.characters,
-        character_start_times_seconds: stripped.startSecs,
-        character_end_times_seconds: stripped.endSecs,
-      };
-    }
-  } else if (tempo !== null && alignment) {
-    // tempo without tag: just scale the timestamps
+  if (alignment) {
+    // Drop the tag's characters, then divide the timestamps by tempo to match the stretched audio.
+    const base = tag
+      ? stripLeadingTag(
+          alignment.characters ?? [],
+          alignment.character_start_times_seconds ?? [],
+          alignment.character_end_times_seconds ?? [],
+        )
+      : {
+          characters: alignment.characters,
+          startSecs: alignment.character_start_times_seconds ?? [],
+          endSecs: alignment.character_end_times_seconds ?? [],
+        };
+    const scale = tempo ?? 1;
     alignment = {
-      characters: alignment.characters,
-      character_start_times_seconds: (alignment.character_start_times_seconds ?? []).map((t) => t / tempo),
-      character_end_times_seconds: (alignment.character_end_times_seconds ?? []).map((t) => t / tempo),
+      characters: base.characters,
+      character_start_times_seconds: base.startSecs.map((t) => t / scale),
+      character_end_times_seconds: base.endSecs.map((t) => t / scale),
     };
   }
 

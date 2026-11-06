@@ -32,8 +32,8 @@ The idea's `look` is where that world starts. You may take it further.
 - **The product.** Show the product's interface only through the real recordings and screenshots
   in `props.json`, unaltered apart from crop, scale and motion. You may draw the product in code
   only as a plainly stylised illustration that no one could take for a real recording.
-- **Hebrew.** Hebrew reads right to left. Mixed Hebrew and English lines keep each word's
-  order, and numbers and English terms are never mirrored.
+- **Hebrew and Arabic.** Both read right to left. Mixed lines (Hebrew or Arabic with English) keep
+  each word's order, and numbers and English terms are never mirrored.
 - **Layout.** Keep the caption band (from y = 1540 down) and the top 150 px clear of anything
   important. The frame draws captions and the AI label there.
 - **Media.** List every media key you show in `USES`. Show real recordings with the label the
