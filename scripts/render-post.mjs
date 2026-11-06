@@ -68,10 +68,10 @@ const main = async () => {
   };
 
   // ─── Step 1: Build props ──────────────────────────────────────────────────
-  let propsPath, props, voiceId, music, musicAbsentReason;
+  let propsPath, props, voiceId, modelId, narration, music, musicAbsentReason;
   try {
     console.log('[render-post] building props…');
-    ({propsPath, props, voiceId, music, musicAbsentReason} = await buildPostProps({jobPath: jobAbs}));
+    ({propsPath, props, voiceId, modelId, narration, music, musicAbsentReason} = await buildPostProps({jobPath: jobAbs}));
   } catch (err) {
     const msg = err.message ?? String(err);
     console.error(`[render-post] props build failed: ${msg}`);
@@ -138,7 +138,9 @@ const main = async () => {
     video: postMp4,
     duration_ms: renderedMs ?? voTotalMs,
     captions: postSrt,
-    voice_id: voiceId,
+    voice_id: voiceId ?? null,
+    model: modelId ?? null,
+    narration: narration ?? [],
     music: music ? {src: music.src} : null,
     music_absent_reason: music ? null : (musicAbsentReason ?? null),
     sfx_cues: props.sfx?.enabled ? templateCues(props.shots) : [],
