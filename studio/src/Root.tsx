@@ -9,6 +9,7 @@ import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
 import { StoryReel, storyReelSchema } from "./templates/StoryReel";
 import { HybridPost, hybridPostSchema } from "./templates/HybridPost";
+import { Thumbnail, thumbnailSchema } from "./templates/Thumbnail";
 import { launchTiming } from "./lib/launchTiming";
 
 export const RemotionRoot: React.FC = () => {
@@ -219,6 +220,22 @@ export const RemotionRoot: React.FC = () => {
             0,
           );
           return {durationInFrames: Math.max(30, totalFrames)};
+        }}
+      />
+      {/* Thumbnail — 1280×720 static card for YouTube / social.
+          renderStill via scripts/render-thumbnail.mjs */}
+      <Composition
+        id="Thumbnail"
+        component={Thumbnail}
+        durationInFrames={1}
+        fps={30}
+        width={1280}
+        height={720}
+        schema={thumbnailSchema}
+        defaultProps={{
+          brandId: "smartcaptions",
+          title: "AI Captions for Premiere Pro",
+          language: "en" as const,
         }}
       />
     </>
