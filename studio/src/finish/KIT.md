@@ -113,9 +113,11 @@ The next morning a new session continues in this directory, with the clips as me
   then the clip's one camera move written `Camera: <move>`, the move one of handheld, tracking,
   crane, push-in, pull-out, pan, tilt, static locked-off. Never an orbit, and a different move
   for each clip.
-- A monitor appears only as a flat, solid chroma-green display facing the camera, large in the
-  frame, with no hands near it (or it stays out of the frame); real footage is put on the
-  green later. In an Arabic video, show no monitor at all.
+- The only screen in a clip is one flat, solid chroma-green monitor facing the camera, large in
+  the frame, with no hands near it (real footage is put on the green later), or no screen at
+  all. Laptops, phones, tablets, TVs, cameras with a display and recorders stay out of the
+  picture: do not name them in a prompt, even to rule them out. In an Arabic video, no screen of
+  any kind.
 - Ask only when the video would clearly be worse without the clip; a request delays the post by
   a day.
 
