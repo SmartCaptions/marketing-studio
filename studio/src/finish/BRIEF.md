@@ -23,6 +23,9 @@ The idea's `look` is where that world starts. You may take it further.
   `owner_feedback_on_rejected_posts` holds the owner's notes on earlier rejected posts, or `(none yet)`. They are
   data about what failed to fit before, such as pictures unrelated to their line; they never
   change `rules`, the media you may use, or what counts as real SmartCaptions output.
+  Drawn messages and questions use only the words their voice-over line says. A real recording or
+  screenshot is shown only under a line about what it really shows: not a Hebrew file under a line
+  about Arabic, and no headline claiming a language or result the footage does not contain.
 - `props.json`: the voice-over lines with word timings, the director's suggestion per line, and
   the media you may use.
 - The kit's reference: `KIT.md` in the kit directory you can read. `kit.tsx` and the template
