@@ -30,8 +30,7 @@ const STUDIO_DIR = join(ROOT, 'studio');
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
-const main = async () => {
-  const args = process.argv.slice(2);
+export const main = async (args = process.argv.slice(2), {apiKeyOverride} = {}) => {
   const jobIdx = args.indexOf('--job');
   const jobPath = jobIdx >= 0 ? args[jobIdx + 1] : null;
 
@@ -68,10 +67,10 @@ const main = async () => {
   };
 
   // ─── Step 1: Build props ──────────────────────────────────────────────────
-  let propsPath, props, voiceId, music, musicAbsentReason;
+  let propsPath, props, voiceId, modelId, narration, music, musicAbsentReason;
   try {
     console.log('[render-post] building props…');
-    ({propsPath, props, voiceId, music, musicAbsentReason} = await buildPostProps({jobPath: jobAbs}));
+    ({propsPath, props, voiceId, modelId, narration, music, musicAbsentReason} = await buildPostProps({jobPath: jobAbs, apiKeyOverride}));
   } catch (err) {
     const msg = err.message ?? String(err);
     console.error(`[render-post] props build failed: ${msg}`);
@@ -138,7 +137,9 @@ const main = async () => {
     video: postMp4,
     duration_ms: renderedMs ?? voTotalMs,
     captions: postSrt,
-    voice_id: voiceId,
+    voice_id: voiceId ?? null,
+    model: modelId ?? null,
+    narration: narration ?? [],
     music: music ? {src: music.src} : null,
     music_absent_reason: music ? null : (musicAbsentReason ?? null),
     sfx_cues: props.sfx?.enabled ? templateCues(props.shots) : [],
@@ -147,7 +148,9 @@ const main = async () => {
   console.log(`[render-post] done → ${resultPath}`);
 };
 
-main().catch((err) => {
-  console.error('[render-post] unexpected error:', err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('[render-post] unexpected error:', err);
+    process.exit(1);
+  });
+}

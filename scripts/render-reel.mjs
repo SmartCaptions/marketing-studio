@@ -103,8 +103,7 @@ const buildSrt = (props) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
-const main = async () => {
-  const args = process.argv.slice(2);
+export const main = async (args = process.argv.slice(2), {apiKeyOverride} = {}) => {
   const jobIdx = args.indexOf('--job');
   const jobPath = jobIdx >= 0 ? args[jobIdx + 1] : null;
 
@@ -128,15 +127,16 @@ const main = async () => {
   const resultPath = join(outputDir, 'result.json');
 
   const writeResult = (status, extra = {}) => {
-    const r = {schema_version: 1, status, video: null, duration_ms: null, captions: null, error: null, ...extra};
+    const r = {schema_version: 1, status, video: null, duration_ms: null, captions: null,
+      voice_id: null, model: null, narration: [], error: null, ...extra};
     writeFileSync(resultPath, JSON.stringify(r, null, 2));
   };
 
   // ─── Step 1: Build props ──────────────────────────────────────────────────
-  let propsPath, props;
+  let propsPath, props, voiceId, modelId, narration;
   try {
     console.log('[render-reel] building props…');
-    ({propsPath, props} = await buildReelProps({jobPath: jobAbs}));
+    ({propsPath, props, voiceId, modelId, narration} = await buildReelProps({jobPath: jobAbs, apiKeyOverride}));
   } catch (err) {
     const msg = err.message ?? String(err);
     console.error(`[render-reel] props build failed: ${msg}`);
@@ -252,11 +252,16 @@ const main = async () => {
     video: reelMp4,
     duration_ms: renderedMs ?? voTotalMs,
     captions: reelSrt,
+    voice_id: voiceId ?? null,
+    model: modelId ?? null,
+    narration: narration ?? [],
   });
   console.log(`[render-reel] done → ${resultPath}`);
 };
 
-main().catch((err) => {
-  console.error('[render-reel] unexpected error:', err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('[render-reel] unexpected error:', err);
+    process.exit(1);
+  });
+}

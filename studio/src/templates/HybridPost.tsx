@@ -53,7 +53,7 @@ import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {duckedVolume, resolveSfxLayers, shotVoWindows, voiceDuck} from '../lib/audioMix';
 import {loadHybridPostFonts} from '../lib/fonts';
-import {isHebrew} from '../lib/locale';
+import {aiDisclosureLabel, isRtl} from '../lib/locale';
 import {brandSpring} from '../lib/motion';
 import {postSfxCues} from '../lib/sfxCues';
 import {phrasesToFrameCues} from '../lib/wordCaptions';
@@ -111,7 +111,7 @@ const shotSchema = z.object({
 
 export const hybridPostSchema = z.object({
   brandId: z.string().default('smartcaptions'),
-  language: z.enum(['he', 'en']).default('he'),
+  language: z.enum(['he', 'en', 'ar']).default('he'),
   look: z.enum(['studio', 'collage']).default('studio'),
   aiDisclosure: z.boolean().default(false),
   wordmarkSrc: z.string().nullable().default(null),
@@ -256,16 +256,15 @@ export const Watermark: React.FC<{look: 'studio' | 'collage'; brandId: string}> 
 // ─────────────────────────────────────────────────────────────────────────────
 // AI disclosure label (shown persistently when ai_disclosure or any clip shot)
 // ─────────────────────────────────────────────────────────────────────────────
-export const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en'; brandId: string}> = ({
+export const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en' | 'ar'; brandId: string}> = ({
   look,
   language,
   brandId,
 }) => {
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
-  const text =
-    language === 'he' ? 'הוויזואליה נוצרה בבינה מלאכותית' : 'AI-generated visuals';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
+  const text = aiDisclosureLabel(language);
 
   if (look === 'collage') {
     // Place in the top margin (above SAFE_TOP) so it never touches shot headings.
@@ -323,7 +322,7 @@ export const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en
           fontFamily: fonts.mono,
           fontSize: 22,
           fontWeight: 500,
-          letterSpacing: isHebrew(language) ? 'normal' : '0.04em',
+          letterSpacing: isRtl(language) ? 'normal' : '0.04em',
           color: brand.colors.ink3,
           unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
         }}
@@ -340,7 +339,7 @@ export const AiLabel: React.FC<{look: 'studio' | 'collage'; language: 'he' | 'en
 export const ShotCaptions: React.FC<{
   captions: PhraseCue[];
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
   sceneStartFrame: number;
 }> = ({captions, look, language, brandId, sceneStartFrame}) => {
@@ -348,7 +347,7 @@ export const ShotCaptions: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const FADE = 4;
 
   const cues = phrasesToFrameCues(captions, sceneStartFrame, fps);
@@ -607,14 +606,14 @@ export const CroppedVideo: React.FC<{
 const TitleShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
 }> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
@@ -719,14 +718,14 @@ const TitleShot: React.FC<{
 const ChatShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
 }> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
@@ -838,7 +837,7 @@ const ChatShot: React.FC<{
 const StepsShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
   durationFrames: number;
 }> = ({shot, look, language, brandId, durationFrames}) => {
@@ -846,7 +845,7 @@ const StepsShot: React.FC<{
   useVideoConfig(); // consumed for Remotion render context; fps not needed here
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
   const items = shot.lines ?? [];
   const popFrames = shot.stepPopFrames ?? items.map((_, i) => Math.round((i / Math.max(1, items.length - 1)) * durationFrames * 0.7));
@@ -991,14 +990,14 @@ const StepsShot: React.FC<{
 const CompareShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
 }> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
@@ -1109,14 +1108,14 @@ const CompareShot: React.FC<{
 const QuestionShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
 }> = ({shot, look, language, brandId}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
@@ -1186,7 +1185,7 @@ const QuestionShot: React.FC<{
 const RecordingShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
   durationFrames: number;
   shotIndex: number;
@@ -1195,7 +1194,7 @@ const RecordingShot: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
@@ -1422,7 +1421,7 @@ const RecordingShot: React.FC<{
 const ClipShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
   shotIndex: number;
 }> = ({shot, look, language, brandId, shotIndex}) => {
@@ -1430,7 +1429,7 @@ const ClipShot: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
 
   const startFrom = shot.start_s ?? 0;
@@ -1522,7 +1521,7 @@ const ClipShot: React.FC<{
 const EndShot: React.FC<{
   shot: Shot;
   look: 'studio' | 'collage';
-  language: 'he' | 'en';
+  language: 'he' | 'en' | 'ar';
   brandId: string;
   wordmarkSrc: string | null;
   attribution: string | null;
@@ -1531,7 +1530,7 @@ const EndShot: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadHybridPostFonts(look, language);
-  const dir = isHebrew(language) ? 'rtl' : 'ltr';
+  const dir = isRtl(language) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const inkColor = look === 'collage' ? COLLAGE_DARK : brand.colors.ink;
 
@@ -1696,15 +1695,11 @@ export const HybridPost: React.FC<HybridPostProps> = ({
   // Show AI disclosure when flag is set or any shot is a clip
   const showAiLabel = aiDisclosure || shots.some((s) => s.kind === 'clip');
 
-  const fadeAmount = interpolate(frame, [0, 6], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
   const XFADE = 8;
 
   return (
     <AbsoluteFill
-      style={{backgroundColor: look === 'collage' ? COLLAGE_PAPER : brand.colors.bg, opacity: fadeAmount}}
+      style={{backgroundColor: look === 'collage' ? COLLAGE_PAPER : brand.colors.bg}}
     >
       {/* Background */}
       <Background look={look} brandId={brandId} />

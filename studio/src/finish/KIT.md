@@ -35,7 +35,7 @@ Import from `remotion` and from `@kit`. Nothing else is installed.
 | `brand` | `brand.colors` (`bg`, `ink`, `ink2`, `ink3`, `brand`, `line`, …), `brand.motion`, `brand.name` |
 | `fonts` | `display`, `body`, `label`, `mono` font families for the look and language |
 | `brandSpring(frame, fps, brand.motion, {delayFrames})`, `entrance(...)`, `staggerDelay(...)` | Brand-tuned motion |
-| `alphaHex(a)`, `isHebrew(lang)`, `fixHebrewPrefixHyphen(text)` | Helpers |
+| `alphaHex(a)`, `isHebrew(lang)`, `isRtl(lang)`, `fixHebrewPrefixHyphen(text)` | Helpers; `isRtl` is true for Hebrew and Arabic |
 | `SAFE_TOP`, `SAFE_LEFT`, `SAFE_RIGHT`, `SAFE_W`, `CAPTION_TOP` | The layout the platforms leave visible. The platform buttons sit on the right edge and the captions below `CAPTION_TOP`. |
 | `Background`, `Watermark`, `MediaCard`, `COLLAGE_PAPER`, `COLLAGE_DARK` | The template's studio and collage pieces, if you want them |
 

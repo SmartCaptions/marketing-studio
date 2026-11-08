@@ -15,19 +15,17 @@ import {spawnSync} from 'node:child_process';
 // ─────────────────────────────────────────────────────────────────────────────
 export const ELEVENLABS_API = 'https://api.elevenlabs.io';
 export const TTS_TIMEOUT = 90_000;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Model to use per language (verified 2026-09). */
-export const MODEL_FOR_LANG = {he: 'eleven_v3', en: 'eleven_multilingual_v2'};
+/** Model to use per language. All languages use eleven_v4 (the current latest). */
+export const MODEL_FOR_LANG = {he: 'eleven_v4', en: 'eleven_v4', ar: 'eleven_v4'};
 
 /**
- * Hebrew voice F settings (owner pick, 2026-09-25):
- *   - stability 0 for a lighter, more expressive delivery
- *   - [cheerfully] prefix tag for the required tone
- *   - 1.15× time-stretch post-TTS (atempo=1.15 => 1/1.15 of original length)
+ * Retries after an ElevenLabs 429, and only a 429: three more attempts, backing off 1 s, 2 s, 4 s.
+ * A 5xx or a timeout may already have been billed, and the account's character allowance is fixed
+ * with no overage, so those fail at once (the same rule as video-factory's text-to-speech).
  */
-export const HEBREW_TAG = '[cheerfully] ';
-export const HEBREW_STABILITY = 0;
-export const HEBREW_TEMPO = 1.15;
+export const TTS_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // .env reader
@@ -62,21 +60,44 @@ export const readEnv = (root) => {
  * Throws a clear error when the voices block is missing or the language is absent.
  *
  * @param {object} brandJson - parsed brand JSON (brands/<id>.json)
- * @param {'he'|'en'} language
+ * @param {'he'|'en'|'ar'} language
  * @returns {string} voice ID
  */
 export const getVoiceId = (brandJson, language) => {
   const voices = brandJson.voices;
   if (!voices)
     throw new Error(
-      `Brand JSON is missing a "voices" block. Add { "voices": { "he": "<voice-id>", "en": "<voice-id>" } }.`,
+      `Brand JSON is missing a "voices" block. Add { "voices": { "he": "<voice-id>", "en": "<voice-id>", "ar": "<voice-id>" } }.`,
     );
   const id = voices[language];
   if (!id)
     throw new Error(
-      `Brand JSON voices block has no entry for language "${language}". Add it.`,
+      `Brand JSON voices block has no entry for language "${language}". Add it to brands/smartcaptions.json.`,
     );
   return id;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-language TTS settings
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Return per-language TTS settings from the brand JSON `ttsSettings` block.
+ * A language with no block gets a plain call: no tag, no stability override, no stretch.
+ *
+ * Shape per language:
+ *   { tag?: string, stability?: number, tempo?: number }
+ *
+ * @param {object} brandJson
+ * @param {'he'|'en'|'ar'} language
+ * @returns {{ tag: string|null, stability: number|null, tempo: number|null }}
+ */
+export const getLangSettings = (brandJson, language) => {
+  const stored = brandJson.ttsSettings?.[language] ?? {};
+  return {
+    tag: stored.tag ?? null,
+    stability: stored.stability ?? null,
+    tempo: stored.tempo ?? null,
+  };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,7 +107,7 @@ export const getVoiceId = (brandJson, language) => {
 /**
  * Strip a leading prose-style tag (`[…] `) from character-level alignment arrays.
  * Called after a Hebrew TTS response to remove the `[cheerfully] ` prefix characters
- * that eleven_v3 returns in its alignment.
+ * that the model returns in its alignment.
  *
  * Returns the trimmed arrays with tag characters removed. When no tag is present the
  * original arrays are returned unchanged.
@@ -118,7 +139,7 @@ export const stripLeadingTag = (characters, startSecs, endSecs) => {
  * unavailable or fails — callers treat audio-stretch failure as non-fatal.
  *
  * @param {Buffer} audioBuffer
- * @param {number} tempo - e.g. 1.15 to get 1/1.15 of original length
+ * @param {number} tempo - e.g. 1.05 to get 1/1.05 of original length
  * @returns {Buffer}
  */
 export const stretchAudio = (audioBuffer, tempo) => {
@@ -153,50 +174,65 @@ export const stretchAudio = (audioBuffer, tempo) => {
  * Call ElevenLabs /v1/text-to-speech/{voice}/with-timestamps and return the
  * audio buffer, word-level alignment data, and computed duration in ms.
  *
- * For Hebrew (`language === 'he'`):
- *   - prefixes text with HEBREW_TAG so ElevenLabs delivers a lighter tone;
- *   - sets voice_settings.stability to HEBREW_STABILITY;
- *   - strips the tag characters from the returned alignment;
- *   - stretches the audio to 1/HEBREW_TEMPO of its original length with ffmpeg;
- *   - divides all character timestamps by HEBREW_TEMPO so captions track the
- *     faster speech exactly.
+ * Per-language behaviour is driven by `langSettings` (from getLangSettings):
+ *   - `tag`:       optional prefix added to the text before the API call; its
+ *                  characters are stripped from the returned alignment.
+ *   - `stability`: optional voice_settings.stability override.
+ *   - `tempo`:     optional post-TTS atempo stretch (> 1 speeds up / shortens).
  *
- * English requests are byte-identical to the pre-Hebrew version.
+ * Without settings there is no tag, no stability override and no stretch; the brand JSON
+ * (`ttsSettings.<language>`) is the only place a language's delivery is tuned.
  *
  * @param {string} text
  * @param {string} voiceId
  * @param {string} modelId
  * @param {string} apiKey
- * @param {'he'|'en'} [language='en']
+ * @param {'he'|'en'|'ar'} [language='en']
+ * @param {{tag?: string|null, stability?: number|null, tempo?: number|null}} [langSettings]
+ * @param {{retryDelaysMs?: number[], sleep?: (ms: number) => Promise<void>}} [options]
+ *   Waits before each retry of a 429 (default TTS_RETRY_DELAYS_MS), and how to wait.
  * @returns {Promise<{audioBuffer: Buffer, alignment: object, durationMs: number}>}
  */
-export const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey, language = 'en') => {
-  const isHebrew = language === 'he';
+export const callTtsWithTimestamps = async (
+  text,
+  voiceId,
+  modelId,
+  apiKey,
+  language = 'en',
+  langSettings = {},
+  {retryDelaysMs = TTS_RETRY_DELAYS_MS, sleep: wait = sleep} = {},
+) => {
+  const {tag = null, stability = null, tempo = null} = langSettings;
 
-  const requestText = isHebrew ? `${HEBREW_TAG}${text}` : text;
+  const requestText = tag ? `${tag}${text}` : text;
   const body = {
     text: requestText,
     model_id: modelId,
     output_format: 'mp3_44100_128',
   };
-  if (isHebrew) {
-    body.voice_settings = {stability: HEBREW_STABILITY};
+  if (stability !== null) {
+    body.voice_settings = {stability};
   }
 
   const url = `${ELEVENLABS_API}/v1/text-to-speech/${voiceId}/with-timestamps`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TTS_TIMEOUT),
-  });
+  let res;
+  for (let attempt = 0; ; attempt++) {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TTS_TIMEOUT),
+    });
+    if (res.status !== 429 || attempt >= retryDelaysMs.length) break;
+    await wait(retryDelaysMs[attempt]);
+  }
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`ElevenLabs ${res.status}: ${body.slice(0, 300)}`);
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`ElevenLabs ${res.status}: ${errBody.slice(0, 300)}`);
   }
 
   const json = await res.json();
@@ -204,21 +240,29 @@ export const callTtsWithTimestamps = async (text, voiceId, modelId, apiKey, lang
   let audioBuffer = Buffer.from(json.audio_base64, 'base64');
   let alignment = json.alignment; // {characters, character_start_times_seconds, character_end_times_seconds}
 
-  if (isHebrew && alignment) {
-    // Strip the [cheerfully] tag characters returned by ElevenLabs from the alignment.
-    const stripped = stripLeadingTag(
-      alignment.characters ?? [],
-      alignment.character_start_times_seconds ?? [],
-      alignment.character_end_times_seconds ?? [],
-    );
-    // Divide all timestamps by HEBREW_TEMPO to match the stretched (faster) audio.
+  if (alignment) {
+    // Drop the tag's characters, then divide the timestamps by tempo to match the stretched audio.
+    const base = tag
+      ? stripLeadingTag(
+          alignment.characters ?? [],
+          alignment.character_start_times_seconds ?? [],
+          alignment.character_end_times_seconds ?? [],
+        )
+      : {
+          characters: alignment.characters,
+          startSecs: alignment.character_start_times_seconds ?? [],
+          endSecs: alignment.character_end_times_seconds ?? [],
+        };
+    const scale = tempo ?? 1;
     alignment = {
-      characters: stripped.characters,
-      character_start_times_seconds: stripped.startSecs.map((t) => t / HEBREW_TEMPO),
-      character_end_times_seconds: stripped.endSecs.map((t) => t / HEBREW_TEMPO),
+      characters: base.characters,
+      character_start_times_seconds: base.startSecs.map((t) => t / scale),
+      character_end_times_seconds: base.endSecs.map((t) => t / scale),
     };
-    // Stretch the audio to 1/HEBREW_TEMPO of its length (faster, lighter delivery).
-    audioBuffer = stretchAudio(audioBuffer, HEBREW_TEMPO);
+  }
+
+  if (tempo !== null) {
+    audioBuffer = stretchAudio(audioBuffer, tempo);
   }
 
   // Measure duration from the last end time in the (possibly stripped/scaled) alignment.

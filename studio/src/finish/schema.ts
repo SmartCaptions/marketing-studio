@@ -50,7 +50,7 @@ const sfxCueSchema = z.object({
 
 export const finishPropsSchema = z.object({
   brandId: z.string(),
-  language: z.enum(['he', 'en']),
+  language: z.enum(['he', 'en', 'ar']),
   look: z.enum(['studio', 'collage']),
   wordmarkSrc: z.string().nullable(),
   attribution: z.string().nullable(),

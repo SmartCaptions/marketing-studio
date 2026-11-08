@@ -9,12 +9,12 @@ import {Img, OffthreadVideo, staticFile} from 'remotion';
 import {fixHebrewPrefixHyphen} from '../lib/bidi';
 import {getBrand} from '../lib/brand';
 import {loadHybridPostFonts} from '../lib/fonts';
-import {isHebrew} from '../lib/locale';
+import {isRtl} from '../lib/locale';
 import {FPS, shotFrames, type FinishMedia, type FinishProps} from './schema';
 
 export {alphaHex, getBrand} from '../lib/brand';
 export {loadHybridPostFonts} from '../lib/fonts';
-export {isHebrew, localeDir} from '../lib/locale';
+export {isHebrew, isRtl, localeDir} from '../lib/locale';
 export {brandSpring, entrance, staggerDelay} from '../lib/motion';
 export {fixHebrewPrefixHyphen} from '../lib/bidi';
 export {
@@ -97,7 +97,7 @@ export const useFinish = () => {
     ...timeline,
     language: props.language,
     look: props.look,
-    dir: isHebrew(props.language) ? ('rtl' as const) : ('ltr' as const),
+    dir: isRtl(props.language) ? ('rtl' as const) : ('ltr' as const),
     brand: getBrand(props.brandId),
     fonts: loadHybridPostFonts(props.look, props.language),
     wordmarkSrc: props.wordmarkSrc,
@@ -124,7 +124,7 @@ export const T: React.FC<{k: string; style?: React.CSSProperties; className?: st
     <span
       className={className}
       style={{
-        direction: isHebrew(language) ? 'rtl' : 'ltr',
+        direction: isRtl(language) ? 'rtl' : 'ltr',
         unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
         ...style,
       }}
@@ -183,7 +183,7 @@ export const Media: React.FC<{
             color: '#e2e8f0',
             fontFamily: fonts.mono,
             fontSize: 22,
-            direction: isHebrew(language) ? 'rtl' : 'ltr',
+            direction: isRtl(language) ? 'rtl' : 'ltr',
             unicodeBidi: 'plaintext' as React.CSSProperties['unicodeBidi'],
           }}
         >

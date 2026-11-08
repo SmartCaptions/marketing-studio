@@ -15,7 +15,7 @@
 import {existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from 'node:fs';
 import {dirname, basename, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, MODEL_FOR_LANG} from './lib/tts.mjs';
+import {readEnv, getVoiceId, getLangSettings, callTtsWithTimestamps, groupToPhrases, MODEL_FOR_LANG} from './lib/tts.mjs';
 
 // Re-export groupToPhrases so existing tests importing it from this module keep working.
 export {groupToPhrases};
@@ -36,14 +36,15 @@ const SCHEMA_VERSION = 1;
  * caption cues from the word-level alignment.
  *
  * @param {{narration: string, sceneIndex: number, label?: string, voiceId: string,
- *          modelId: string, apiKey: string, language: string, reelPublicDir: string}} opts
- * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array}>}
+ *          modelId: string, apiKey: string, language: string, langSettings: object,
+ *          reelPublicDir: string}} opts
+ * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array, audioAbs: string}>}
  */
-const processNarration = async ({narration, sceneIndex, label, voiceId, modelId, apiKey, language, reelPublicDir}) => {
+const processNarration = async ({narration, sceneIndex, label, voiceId, modelId, apiKey, language, langSettings, reelPublicDir}) => {
   const tag = label ? ` (${label})` : '';
   console.log(`[build-reel-props] scene ${sceneIndex}${tag}: TTS "${narration.slice(0, 60)}…"`);
 
-  const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(narration, voiceId, modelId, apiKey, language);
+  const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(narration, voiceId, modelId, apiKey, language, langSettings);
 
   const audioAbs = join(reelPublicDir, `scene-${sceneIndex}.mp3`);
   writeFileSync(audioAbs, audioBuffer);
@@ -58,7 +59,7 @@ const processNarration = async ({narration, sceneIndex, label, voiceId, modelId,
     : [];
 
   console.log(`[build-reel-props] scene ${sceneIndex}: ${durationMs}ms, ${captions.length} caption phrases`);
-  return {audioRelative, durationMs, captions};
+  return {audioRelative, durationMs, captions, audioAbs};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,8 +75,8 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   }
 
   const lang = job.language ?? 'he';
-  if (lang !== 'he' && lang !== 'en') {
-    throw new Error(`language must be "he" or "en", got "${lang}".`);
+  if (lang !== 'he' && lang !== 'en' && lang !== 'ar') {
+    throw new Error(`language must be "he", "en" or "ar", got "${lang}".`);
   }
 
   const outputDir = resolve(outDirOverride ?? job.output_dir);
@@ -89,8 +90,10 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   }
 
   const brandJson = JSON.parse(readFileSync(join(ROOT, 'brands', 'smartcaptions.json'), 'utf8'));
-  const voiceId = getVoiceId(brandJson, lang);
+  // Use voice_id from job when provided (D3: chosen voice); fall back to brand default.
+  const voiceId = job.voice_id ?? getVoiceId(brandJson, lang);
   const modelId = MODEL_FOR_LANG[lang];
+  const langSettings = getLangSettings(brandJson, lang);
 
   // 3. Reel media dir under studio/public/reels/<id>/ (gitignored)
   const reelId = job.id ?? `reel-${Date.now()}`;
@@ -99,6 +102,7 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
 
   // 4. Process scenes
   const processedScenes = [];
+  const narrationLog = []; // for result.json (§7 contract)
   for (let i = 0; i < job.scenes.length; i++) {
     const scene = job.scenes[i];
 
@@ -112,7 +116,7 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
       }
 
       // Still needs voice-over narration
-      const {audioRelative, durationMs, captions} = await processNarration({
+      const {audioRelative, durationMs, captions, audioAbs} = await processNarration({
         narration: scene.narration,
         sceneIndex: i,
         label: 'output',
@@ -120,8 +124,10 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
         modelId,
         apiKey,
         language: lang,
+        langSettings,
         reelPublicDir,
       });
+      narrationLog.push({text: scene.narration, audio: audioAbs});
 
       processedScenes.push({
         kind: 'output',
@@ -149,15 +155,17 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
     const mediaRelative = relative(STUDIO_PUBLIC, destAbs);
 
     // Generate voice-over for this scene
-    const {audioRelative, durationMs, captions} = await processNarration({
+    const {audioRelative, durationMs, captions, audioAbs} = await processNarration({
       narration: scene.narration,
       sceneIndex: i,
       voiceId,
       modelId,
       apiKey,
       language: lang,
+      langSettings,
       reelPublicDir,
     });
+    narrationLog.push({text: scene.narration, audio: audioAbs});
 
     processedScenes.push({
       kind: scene.kind,
@@ -185,7 +193,7 @@ export const buildReelProps = async ({jobPath, outDirOverride, apiKeyOverride} =
   writeFileSync(propsPath, JSON.stringify(props, null, 2));
   console.log(`[build-reel-props] wrote props to ${propsPath}`);
 
-  return {propsPath, props};
+  return {propsPath, props, voiceId, modelId, narration: narrationLog};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

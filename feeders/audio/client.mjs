@@ -16,7 +16,7 @@ import {spawnSync} from 'node:child_process';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API = 'https://api.elevenlabs.io';
-const DEFAULT_VOICE = '21m00Tcm4TlvDq8ikWAM'; // Rachel (premade)
+const DEFAULT_VOICE = '21m00Tcm4TlvDq8ikWAM'; // only for the standalone `vo` command; reels take voices from the brand JSON
 const TTS_TIMEOUT = 60_000;
 const MUSIC_TIMEOUT = 300_000;
 const SFX_TIMEOUT = 120_000;
@@ -142,7 +142,7 @@ const main = async () => {
       for (const line of script.lines) {
         const bytes = await generate(
           buildTtsUrl(voice),
-          {text: line.text, model_id: 'eleven_multilingual_v2'},
+          {text: line.text, model_id: 'eleven_v4'},
           key,
           TTS_TIMEOUT,
         );

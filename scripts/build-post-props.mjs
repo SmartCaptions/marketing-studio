@@ -16,7 +16,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync} from '
 import {dirname, basename, extname, join, resolve, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {readEnv, getVoiceId, callTtsWithTimestamps, groupToPhrases, alignmentToWords, MODEL_FOR_LANG} from './lib/tts.mjs';
+import {readEnv, getVoiceId, getLangSettings, callTtsWithTimestamps, groupToPhrases, alignmentToWords, MODEL_FOR_LANG} from './lib/tts.mjs';
 import {buildMusicPrompt, effectGains, generatePostMusic} from './lib/postMusic.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,8 +39,8 @@ const validateJob = (job) => {
     throw new Error(`schema_version must be ${SCHEMA_VERSION}, got ${job.schema_version}`);
   if (!job.id || typeof job.id !== 'string')
     throw new Error('job.id is required (string)');
-  if (job.language !== 'he' && job.language !== 'en')
-    throw new Error(`job.language must be "he" or "en", got "${job.language}"`);
+  if (job.language !== 'he' && job.language !== 'en' && job.language !== 'ar')
+    throw new Error(`job.language must be "he", "en" or "ar", got "${job.language}"`);
   if (job.look !== 'studio' && job.look !== 'collage')
     throw new Error(`job.look must be "studio" or "collage", got "${job.look}"`);
   if (!Array.isArray(job.shots) || job.shots.length < 1 || job.shots.length > 10)
@@ -109,14 +109,15 @@ const calcStepPopFrames = (items, captions, durationMs, fps) => {
 
 /**
  * @param {{narration: string, shotIndex: number, voiceId: string, modelId: string,
- *           apiKey: string, language: string, postPublicDir: string, publicRoot: string}} opts
- * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array, words: Array}>}
+ *           apiKey: string, language: string, langSettings: object,
+ *           postPublicDir: string, publicRoot: string}} opts
+ * @returns {Promise<{audioRelative: string, durationMs: number, captions: Array, words: Array, audioAbs: string}>}
  */
-const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey, language, postPublicDir, publicRoot}) => {
+const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey, language, langSettings, postPublicDir, publicRoot}) => {
   console.log(`[build-post-props] shot ${shotIndex}: TTS "${narration.slice(0, 60)}…"`);
 
   const {audioBuffer, alignment, durationMs} = await callTtsWithTimestamps(
-    narration, voiceId, modelId, apiKey, language,
+    narration, voiceId, modelId, apiKey, language, langSettings,
   );
 
   const audioAbs = join(postPublicDir, `shot-${shotIndex}.mp3`);
@@ -139,7 +140,7 @@ const processNarration = async ({narration, shotIndex, voiceId, modelId, apiKey,
     : [];
 
   console.log(`[build-post-props] shot ${shotIndex}: ${durationMs}ms, ${captions.length} phrases`);
-  return {audioRelative, durationMs, captions, words};
+  return {audioRelative, durationMs, captions, words, audioAbs};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -229,8 +230,10 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not set in .env');
 
   const brandJson = JSON.parse(readFileSync(join(ROOT, 'brands', 'smartcaptions.json'), 'utf8'));
-  const voiceId = getVoiceId(brandJson, job.language);
+  // Use voice_id from job when provided (D3: chosen voice); fall back to brand default.
+  const voiceId = job.voice_id ?? getVoiceId(brandJson, job.language);
   const modelId = MODEL_FOR_LANG[job.language];
+  const langSettings = getLangSettings(brandJson, job.language);
   console.log(`[build-post-props] language=${job.language} voice=${voiceId} model=${modelId}`);
 
   // 3. Public media dir — derive a unique staging directory from job.id AND the
@@ -246,6 +249,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
 
   // 5. Process shots
   const processedShots = [];
+  const narrationLog = []; // for result.json (§7 contract)
   const fps = 30;
 
   for (let i = 0; i < job.shots.length; i++) {
@@ -253,16 +257,18 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
     const isEnd = shot.kind === 'end';
 
     // TTS narration
-    const {audioRelative, durationMs: narrationMs, captions, words} = await processNarration({
+    const {audioRelative, durationMs: narrationMs, captions, words, audioAbs} = await processNarration({
       narration: shot.narration,
       shotIndex: i,
       voiceId,
       modelId,
       apiKey,
       language: job.language,
+      langSettings,
       postPublicDir,
       publicRoot,
     });
+    narrationLog.push({text: shot.narration, audio: audioAbs});
 
     // Duration = narration + gap, end shot gets extra hold
     const durationMs = narrationMs + GAP_MS + (isEnd ? END_HOLD_MS : 0);
@@ -355,7 +361,7 @@ export const buildPostProps = async ({jobPath, outDirOverride, apiKeyOverride, p
   writeFileSync(propsPath, JSON.stringify(props, null, 2));
   console.log(`[build-post-props] wrote props to ${propsPath}`);
 
-  return {propsPath, props, voiceId, music, musicAbsentReason};
+  return {propsPath, props, voiceId, modelId, narration: narrationLog, music, musicAbsentReason};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

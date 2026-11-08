@@ -25,6 +25,12 @@ describe('buildMusicPrompt', () => {
     assert.ok(p.includes('upbeat') || p.includes('energetic'), `expected energetic feel in "${p}"`);
   });
 
+  test('Arabic keeps the calm default mood and describes no style of its own', () => {
+    const p = buildMusicPrompt('ar', 'studio', undefined);
+    assert.equal(p, buildMusicPrompt('en', 'studio', undefined));
+    assert.ok(!p.includes('upbeat'), `expected the calm default in "${p}"`);
+  });
+
   test('tip postType adds informative/dynamic descriptor', () => {
     const p = buildMusicPrompt('en', 'studio', 'quick_tip');
     assert.ok(p.includes('informative') || p.includes('dynamic'), `expected informative in "${p}"`);

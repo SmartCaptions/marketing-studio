@@ -34,7 +34,7 @@ import {
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {loadLocaleFonts} from '../lib/fonts';
-import {isHebrew} from '../lib/locale';
+import {aiDisclosureLabel, isRtl} from '../lib/locale';
 import {brandSpring} from '../lib/motion';
 import {getHeroMark} from '../brands/marks';
 import {phrasesToFrameCues} from '../lib/wordCaptions';
@@ -74,7 +74,7 @@ const sceneSchema = z.object({
 
 export const storyReelSchema = z.object({
   brandId: z.string(),
-  language: z.enum(['he', 'en']).default('he'),
+  language: z.enum(['he', 'en', 'ar']).default('he'),
   hook: z.string(),
   cta: z.string(),
   aiDisclosure: z.boolean().default(false),
@@ -115,7 +115,7 @@ const HookScene: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadLocaleFonts(brand, locale);
-  const dir = isHebrew(locale) ? 'rtl' : 'ltr';
+  const dir = isRtl(locale) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   // Fast entrance: text punches in from slightly below within the first 10 frames.
   const enterY = interpolate(frame, [0, 10], [28, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
@@ -244,7 +244,7 @@ const SceneCaptions: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadLocaleFonts(brand, locale);
-  const dir = isHebrew(locale) ? 'rtl' : 'ltr';
+  const dir = isRtl(locale) ? 'rtl' : 'ltr';
   const FADE_FRAMES = 4;
 
   const cues = phrasesToFrameCues(captions, sceneStartFrame, fps);
@@ -316,8 +316,8 @@ const AiDisclosureLabel: React.FC<{
 }> = ({brandId, locale}) => {
   const brand = getBrand(brandId);
   const fonts = loadLocaleFonts(brand, locale);
-  const dir = isHebrew(locale) ? 'rtl' : 'ltr';
-  const text = isHebrew(locale) ? 'הוויזואליה נוצרה בבינה מלאכותית' : 'AI-generated visuals';
+  const dir = isRtl(locale) ? 'rtl' : 'ltr';
+  const text = aiDisclosureLabel(locale);
 
   return (
     <div
@@ -352,7 +352,7 @@ const AiDisclosureLabel: React.FC<{
           fontWeight: 500,
           // No letter-spacing on Hebrew: it spaces out individual letters and
           // breaks the visual flow of connected script.
-          letterSpacing: isHebrew(locale) ? 'normal' : '0.04em',
+          letterSpacing: isRtl(locale) ? 'normal' : '0.04em',
           color: brand.colors.ink3,
           unicodeBidi: 'plaintext',
         }}
@@ -376,10 +376,13 @@ const OutputScene: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadLocaleFonts(brand, locale);
-  const dir = isHebrew(locale) ? 'rtl' : 'ltr';
+  const dir = isRtl(locale) ? 'rtl' : 'ltr';
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fade(frame, 0, 8, durationFrames - 8, durationFrames);
-  const label = isHebrew(locale) ? 'פלט של SmartCaptions' : 'SmartCaptions output';
+  const label =
+    locale === 'he' ? `פלט של ${brand.name}` :
+    locale === 'ar' ? `مخرجات ${brand.name}` :
+    `${brand.name} output`;
 
   return (
     <AbsoluteFill
@@ -439,7 +442,7 @@ const OutputScene: React.FC<{
                 fontSize: 24,
                 fontWeight: 600,
                 // No letter-spacing when the label text is Hebrew.
-                letterSpacing: isHebrew(locale) ? 'normal' : '0.06em',
+                letterSpacing: isRtl(locale) ? 'normal' : '0.06em',
                 color: brand.colors.brand,
                 unicodeBidi: 'plaintext',
               }}
@@ -491,7 +494,7 @@ const ReelEndCard: React.FC<{
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
   const fonts = loadLocaleFonts(brand, locale);
-  const dir = isHebrew(locale) ? 'rtl' : 'ltr';
+  const dir = isRtl(locale) ? 'rtl' : 'ltr';
   const Mark = getHeroMark(brand.id);
   const spring = brandSpring(frame, fps, brand.motion);
   const opacity = fade(frame, 0, 12, durationFrames - 8, durationFrames);
@@ -591,10 +594,8 @@ export const StoryReel: React.FC<StoryReelProps> = ({
   }
   const endCardStart = cursor;
 
-  const fadeAmount = interpolate(frame, [0, 6], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-
   return (
-    <AbsoluteFill style={{backgroundColor: brand.colors.bg, opacity: fadeAmount}}>
+    <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
       {/* ── Background: dark brand gradient behind all scenes ── */}
       <AbsoluteFill
         style={{

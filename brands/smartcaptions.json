@@ -34,7 +34,15 @@
   },
   "voice": "Editor-to-editor, plain and confident, no hype. Blue (#1667ff) is the brand and carries UI surfaces; the logo's orange (#f7941d) and amber (#f9b233) are energy accents for highlights and caption emphasis only, never backgrounds. Captions read as captions: high-contrast white text on dark. Premiere Pro is the stage, the panel is the tool; show the work getting shorter.",
   "voices": {
-    "he": "a5Go0BgNOV759EHhYgDP",
-    "en": "FGY2WhTYpPnrIDTdsKH5"
+    "he": "oQlG5Oc7eHRK3q4s1cW9",
+    "en": "OgDBPcv0x6O1lsuZ6IfR",
+    "ar": "DZOhuamxb9bDCgDeFK84"
+  },
+  "ttsSettings": {
+    "he": {
+      "tag": "[cheerfully] ",
+      "stability": 0,
+      "tempo": 1.05
+    }
   }
 }

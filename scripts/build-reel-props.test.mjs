@@ -6,11 +6,12 @@
  */
 import {describe, it, mock} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdirSync, writeFileSync, rmSync, existsSync} from 'node:fs';
+import {mkdirSync, writeFileSync, rmSync, existsSync, readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import {groupToPhrases} from './build-reel-props.mjs';
+import {withFakeTools} from './lib/fake-tools.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 
@@ -138,8 +139,11 @@ describe('buildReelProps (stubbed network)', () => {
     return {ok: false, text: async () => 'unexpected url', status: 500};
   };
 
-  const setupTmpJob = (language = 'he') => {
-    const tmpBase = join(tmpdir(), `reel-test-${Date.now()}`);
+  let jobCount = 0;
+  // `narrations` lists the spoken lines: the first is an image scene, the rest are output scenes.
+  // Any other key overrides the job's field of that name.
+  const setupTmpJob = (language = 'he', {narrations = [language === 'he' ? 'שלום עולם' : 'Hello world'], ...jobExtra} = {}) => {
+    const tmpBase = join(tmpdir(), `reel-test-${Date.now()}-${jobCount++}`);
     mkdirSync(tmpBase, {recursive: true});
 
     // Create a stub media file
@@ -154,12 +158,15 @@ describe('buildReelProps (stubbed network)', () => {
       id: 'test-reel-001',
       language,
       hook: language === 'he' ? 'כתוביות בלחיצה אחת' : 'Captions in one click',
-      scenes: [
-        {media: mediaPath, kind: 'image', narration: language === 'he' ? 'שלום עולם' : 'Hello world'},
-      ],
+      scenes: narrations.map((narration, i) =>
+        i === 0
+          ? {media: mediaPath, kind: 'image', narration}
+          : {kind: 'output', lines: ['00:00:01,200 --> 00:00:03,400', narration], narration},
+      ),
       cta: 'smartcaptions.co.il',
       ai_disclosure: true,
       output_dir: outputDir,
+      ...jobExtra,
     };
 
     const jobPath = join(tmpBase, 'job.json');
@@ -291,6 +298,106 @@ describe('buildReelProps (stubbed network)', () => {
       );
     } finally {
       rmSync(tmpBase, {recursive: true, force: true});
+    }
+  });
+
+  // ── The BrAInd contract: which voice speaks, and what result.json reports about it ──
+  // Expectations come from the README (job `voice_id`, `voices.<language>`, `ttsSettings.<language>`,
+  // `eleven_v4` for every line, result.json `voice_id` / `model` / `narration` [{text, audio}]).
+  const brand = JSON.parse(readFileSync(join(ROOT, 'brands', 'smartcaptions.json'), 'utf8'));
+  const publicReelDir = (id) => join(ROOT, 'studio', 'public', 'reels', id);
+
+  /** Run buildReelProps against a fetch that records each TTS request. */
+  const buildRecording = async (jobPath) => {
+    const calls = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      calls.push({url, body: JSON.parse(opts.body)});
+      return stubFetch(url, opts);
+    };
+    try {
+      const {buildReelProps} = await import('./build-reel-props.mjs');
+      const built = await buildReelProps({jobPath, apiKeyOverride: 'stub-key'});
+      return {...built, calls};
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  };
+
+  const ttsPath = (voiceId) => `/v1/text-to-speech/${voiceId}/with-timestamps`;
+
+  it('speaks every line with the job voice_id', async () => {
+    const id = 'test-contract-job-voice';
+    const {jobPath, tmpBase} = setupTmpJob('en', {id, voice_id: 'job-chosen-voice', narrations: ['First line', 'Second line']});
+    try {
+      const {calls, voiceId} = await buildRecording(jobPath);
+      assert.equal(calls.length, 2);
+      for (const c of calls) assert.ok(c.url.endsWith(ttsPath('job-chosen-voice')), c.url);
+      assert.equal(voiceId, 'job-chosen-voice');
+    } finally {
+      rmSync(tmpBase, {recursive: true, force: true});
+      rmSync(publicReelDir(id), {recursive: true, force: true});
+    }
+  });
+
+  it('speaks with the brand voice for the language when the job has no voice_id', async () => {
+    const id = 'test-contract-brand-voice';
+    const {jobPath, tmpBase} = setupTmpJob('en', {id});
+    try {
+      const {calls, voiceId} = await buildRecording(jobPath);
+      assert.ok(calls[0].url.endsWith(ttsPath(brand.voices.en)), calls[0].url);
+      assert.equal(voiceId, brand.voices.en);
+    } finally {
+      rmSync(tmpBase, {recursive: true, force: true});
+      rmSync(publicReelDir(id), {recursive: true, force: true});
+    }
+  });
+
+  it('accepts language "ar" and asks for the Arabic voice on eleven_v4 with the Arabic delivery', async () => {
+    const id = 'test-contract-arabic';
+    const narrations = ['مرحبا بالعالم', 'هذا هو الناتج'];
+    const {jobPath, tmpBase} = setupTmpJob('ar', {id, narrations});
+    try {
+      const {props, calls} = await buildRecording(jobPath);
+      assert.equal(props.language, 'ar');
+      assert.equal(calls.length, 2);
+      // ttsSettings.<language> is the only place a language's delivery is set; Arabic's block is optional
+      const delivery = brand.ttsSettings?.ar ?? {};
+      calls.forEach((c, i) => {
+        assert.ok(c.url.endsWith(ttsPath(brand.voices.ar)), c.url);
+        assert.equal(c.body.model_id, 'eleven_v4');
+        assert.equal(c.body.text, `${delivery.tag ?? ''}${narrations[i]}`);
+        assert.deepEqual(c.body.voice_settings, delivery.stability === undefined ? undefined : {stability: delivery.stability});
+      });
+    } finally {
+      rmSync(tmpBase, {recursive: true, force: true});
+      rmSync(publicReelDir(id), {recursive: true, force: true});
+    }
+  });
+
+  it('result.json reports the voice_id, model and narration [{text, audio}] of the voice-over', async () => {
+    const id = 'test-contract-result';
+    const narrations = ['مرحبا بالعالم', 'هذا هو الناتج'];
+    const {jobPath, outputDir, tmpBase} = setupTmpJob('ar', {id, voice_id: 'job-chosen-voice', narrations});
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = stubFetch;
+    try {
+      const {main} = await import('./render-reel.mjs');
+      await withFakeTools(() => main(['--job', jobPath], {apiKeyOverride: 'stub-key'}));
+
+      const result = JSON.parse(readFileSync(join(outputDir, 'result.json'), 'utf8'));
+      assert.equal(result.status, 'done');
+      assert.equal(result.voice_id, 'job-chosen-voice');
+      assert.equal(result.model, 'eleven_v4');
+      assert.deepEqual(result.narration.map((n) => n.text), narrations);
+      for (const n of result.narration) {
+        assert.deepEqual(Object.keys(n).sort(), ['audio', 'text']);
+        assert.deepEqual(readFileSync(n.audio), stubMp3, `no voice-over file at ${n.audio}`);
+      }
+    } finally {
+      globalThis.fetch = origFetch;
+      rmSync(tmpBase, {recursive: true, force: true});
+      rmSync(publicReelDir(id), {recursive: true, force: true});
     }
   });
 });

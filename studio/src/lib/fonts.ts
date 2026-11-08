@@ -8,6 +8,7 @@ import {loadFont as loadRubik} from '@remotion/google-fonts/Rubik';
 import {loadFont as loadSecularOne} from '@remotion/google-fonts/SecularOne';
 import {loadFont as loadSuezOne} from '@remotion/google-fonts/SuezOne';
 import {loadFont as loadAmaticSC} from '@remotion/google-fonts/AmaticSC';
+import {loadFont as loadNotoSansArabic} from '@remotion/google-fonts/NotoSansArabic';
 import type {Brand} from './brand';
 
 // Load once at module scope; Remotion delays render until fonts resolve.
@@ -44,6 +45,12 @@ const families: Record<string, string> = {
   // Bold only; latin subset (caption text is always short ASCII or single-lang).
   'Amatic SC': loadAmaticSC('normal', {weights: ['400', '700'], subsets: ['latin', 'hebrew']})
     .fontFamily,
+  // A-1: Noto Sans Arabic with arabic+latin subsets for RTL/Arabic renders.
+  // Weights match the Hebrew/Latin usage (400/600/700/800).
+  'Noto Sans Arabic': loadNotoSansArabic('normal', {
+    weights: ['400', '600', '700', '800'],
+    subsets: ['arabic', 'latin'],
+  }).fontFamily,
 };
 
 const resolve = (name: string): string => {
@@ -63,20 +70,20 @@ export const loadBrandFonts = (brand: Brand) => ({
 });
 
 /**
- * Resolve fonts for a locale-aware render. When `locale` is a Hebrew locale
- * ('he' or any 'he-*' tag), display and body swap to Rubik (which ships
- * hebrew+latin subsets) while mono stays on the brand's configured mono face.
- * All other locales fall through to `loadBrandFonts` unchanged so existing
- * English renders stay byte-identical.
+ * Resolve fonts for a locale-aware render.
+ * - Hebrew ('he' or 'he-*'): Rubik (hebrew+latin subsets).
+ * - Arabic ('ar' or 'ar-*'): Noto Sans Arabic (arabic+latin subsets).
+ * - Other locales: brand's configured fonts (unchanged — existing English renders
+ *   stay byte-identical).
  */
 export const loadLocaleFonts = (brand: Brand, locale?: string | null) => {
-  const isHebrew = typeof locale === 'string' && /^he\b/.test(locale);
-  if (!isHebrew) return loadBrandFonts(brand);
-  return {
-    display: resolve('Rubik'),
-    body: resolve('Rubik'),
-    mono: resolve(brand.fonts.mono),
-  };
+  if (typeof locale === 'string' && /^he\b/.test(locale)) {
+    return {display: resolve('Rubik'), body: resolve('Rubik'), mono: resolve(brand.fonts.mono)};
+  }
+  if (typeof locale === 'string' && /^ar\b/.test(locale)) {
+    return {display: resolve('Noto Sans Arabic'), body: resolve('Noto Sans Arabic'), mono: resolve(brand.fonts.mono)};
+  }
+  return loadBrandFonts(brand);
 };
 
 /**
@@ -87,22 +94,26 @@ export const loadLocaleFonts = (brand: Brand, locale?: string | null) => {
  *
  * Collage look: Suez One for display headings (editorial serif), Rubik for body,
  * Amatic SC for handwritten label-tape captions and sticky-note labels.
+ *
+ * Arabic overrides body/label to Noto Sans Arabic for both looks.
  */
-export const loadHybridPostFonts = (look: 'studio' | 'collage', language?: 'he' | 'en') => {
+export const loadHybridPostFonts = (look: 'studio' | 'collage', language?: 'he' | 'en' | 'ar') => {
+  const isAr = language === 'ar';
   if (look === 'collage') {
     return {
-      display: resolve('Suez One'),
-      body: resolve('Rubik'),
+      display: isAr ? resolve('Noto Sans Arabic') : resolve('Suez One'),
       // Amatic SC is the handwritten label-tape feel for Hebrew/collage captions.
       // For English it turns into small-caps that are hard to read — use Rubik instead.
-      label: language === 'en' ? resolve('Rubik') : resolve('Amatic SC'),
+      // For Arabic use Noto Sans Arabic so letters join correctly.
+      body: isAr ? resolve('Noto Sans Arabic') : resolve('Rubik'),
+      label: language === 'en' ? resolve('Rubik') : (isAr ? resolve('Noto Sans Arabic') : resolve('Amatic SC')),
       mono: resolve('Geist Mono'),
     };
   }
   return {
-    display: resolve('Secular One'),
-    body: resolve('Rubik'),
-    label: resolve('Geist Mono'),
+    display: isAr ? resolve('Noto Sans Arabic') : resolve('Secular One'),
+    body: isAr ? resolve('Noto Sans Arabic') : resolve('Rubik'),
+    label: isAr ? resolve('Noto Sans Arabic') : resolve('Geist Mono'),
     mono: resolve('Geist Mono'),
   };
 };
