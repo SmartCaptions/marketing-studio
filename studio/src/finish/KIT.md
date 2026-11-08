@@ -104,8 +104,25 @@ shows, you can ask tonight's run for up to 3 new AI clips instead of rendering t
 The next morning a new session continues in this directory, with the clips as media `new1`,
 `new2`, … (about 5 s, 9:16). Using one turns on the video's AI label.
 
-- The prompts describe a scene only: no words, letters, numbers, logos, screens or software
-  interface. The factory refuses those.
+- The prompts describe a scene only: no words, letters, numbers, logos or software interface.
+  The factory refuses those.
+- People appear only where the line involves a person or an action by one. They are invented and
+  anonymous, never a real person or a likeness of one.
+- `motion_prompt` is one short line: what the people do in five seconds (a turn, a lean in, a
+  nod, handing something over, a short cheer; never walking across the frame or fast gestures),
+  then the clip's one camera move written `Camera: <move>`, the move one of handheld, tracking,
+  crane, push-in, pull-out, pan, tilt, static locked-off. Never an orbit, and a different move
+  for each clip.
+- Set each clip where screens do not live: a doorway, lobby, corridor, street, cafe table,
+  loading bay or meeting-room table with paper, never an edit suite, studio, control room,
+  review bay or any room full of equipment. People hold nothing flat, rectangular and
+  palm-sized (no drive, card or slab): a padded envelope, a key, a folder, a mug or a headset on
+  its cable.
+- The only screen in a clip is one flat, solid chroma-green monitor facing the camera, large in
+  the frame, with no hands near it and nothing else green near it (real footage is put on the
+  green later), or no screen at all. Laptops, phones, tablets, TVs, cameras with a display and
+  recorders stay out of the picture: do not name them in a prompt, even to rule them out. In an
+  Arabic video, no screen of any kind.
 - Ask only when the video would clearly be worse without the clip; a request delays the post by
   a day.
 
